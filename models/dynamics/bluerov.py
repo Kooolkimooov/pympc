@@ -1,7 +1,7 @@
 from numpy import array, concatenate, cos, cross, diag, exp, eye, ndarray, sin, tan, zeros
 from numpy.linalg import inv
 
-from ...utils import G, rho_eau
+from pympc.utils import G, rho_eau
 
 
 class Bluerov:

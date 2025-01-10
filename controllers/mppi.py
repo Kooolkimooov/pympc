@@ -11,8 +11,8 @@ from time import perf_counter
 from numpy import array, average, diff, exp, eye, inf, ndarray, ones, random, zeros
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 from scipy.optimize._differentialevolution import _ConstraintWrapper
-from .mpc import MPC
-from ..models.model import Model
+from pympc.controllers.mpc import MPC
+from pympc.models.model import Model
 
 
 class MPPI( MPC ):
@@ -203,8 +203,8 @@ class MPPI( MPC ):
 
 
 if __name__ == '__main__':
-  from models.dynamics.bluerov import Bluerov
-  from utils import generate_trajectory
+  from pympc.models.dynamics.bluerov import Bluerov
+  from pympc.utils import generate_trajectory
   from numpy import set_printoptions, logspace
   import matplotlib.pyplot as plt
 

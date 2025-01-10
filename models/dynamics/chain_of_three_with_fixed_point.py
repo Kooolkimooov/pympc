@@ -3,9 +3,9 @@ from warnings import simplefilter
 from numpy import dot, ndarray, r_, zeros
 from numpy.linalg import norm
 
-from .bluerov import BluerovXYZPsi as Bluerov
-from .catenary import Catenary
-from .seafloor import Seafloor
+from pympc.models.catenary import Catenary
+from pympc.models.dynamics.bluerov import BluerovXYZPsi as Bluerov
+from pympc.models.seafloor import Seafloor
 
 simplefilter( 'ignore', RuntimeWarning )
 

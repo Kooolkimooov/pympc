@@ -3,8 +3,8 @@ from warnings import simplefilter
 from numpy import dot, ndarray, r_, zeros
 from numpy.linalg import norm
 
-from .bluerov import Bluerov
-from .catenary import Catenary
+from pympc.models.catenary import Catenary
+from pympc.models.dynamics.bluerov import Bluerov
 
 simplefilter( 'ignore', RuntimeWarning )
 
