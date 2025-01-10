@@ -21,7 +21,7 @@ from numpy.linalg import norm
 from scipy.optimize import brentq
 from tqdm import tqdm
 
-from ...utils import check, G
+from pympc.utils import check, G
 
 
 class Catenary:
