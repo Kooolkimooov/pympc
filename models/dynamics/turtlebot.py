@@ -22,7 +22,7 @@ class Turtlebot:
     :return: state derivative of the system
     """
 
-    xdot = zeros( (3,) )
+    xdot = zeros( (6,) )
     xdot[ 0 ] = cos( state[ 2 ] ) * actuation[ 0 ]
     xdot[ 1 ] = sin( state[ 2 ] ) * actuation[ 0 ]
     xdot[ 2 ] = actuation[ 1 ]
