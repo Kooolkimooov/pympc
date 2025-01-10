@@ -6,8 +6,8 @@ class Turtlebot:
   Turtlebot model
   """
 
-  state_size = 3
-  pose_size = 2
+  state_size = 6
+  pose_size = 3
   actuation_size = 2
   linear_actuation_size = 1
 

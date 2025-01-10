@@ -2,14 +2,17 @@ from numpy import array, ndarray, pi, zeros
 from scipy.spatial.transform import Rotation
 
 from geometry_msgs.msg import Pose, Twist
-from pympc.models.dynamics.turtlebot import Turtlebot
-from pympc.models.ros_interface.base_interface import BaseInterface
+from .base_interface import BaseInterface
+from ..dynamics.turtlebot import Turtlebot
 
 
 class TurtlebotROSInterface( BaseInterface ):
 
   command_type = Twist
   initial_state = zeros( (3,) )
+
+  max_linear_speed = 0.65
+  max_angular_speed = pi
 
   @staticmethod
   def ros_pose_from_state( state: ndarray ) -> Pose:
@@ -26,22 +29,38 @@ class TurtlebotROSInterface( BaseInterface ):
     return pose
 
   @staticmethod
-  def actuation_from_ros_actuation( actuation ) -> ndarray:
+  def pose_from_ros_pose( ros_pose: Pose ) -> ndarray:
+    pose = zeros( (6,) )
+    pose[ 0 ] = ros_pose.position.x
+    pose[ 1 ] = ros_pose.position.y
+    pose[ 2 ] = Rotation.from_quat(
+        [ ros_pose.orientation.x, ros_pose.orientation.y, ros_pose.orientation.z, ros_pose.orientation.w ]
+        ).as_euler( 'xyz' )[2]
+    return pose
+
+  @staticmethod
+  def actuation_from_ros_actuation( ros_actuation ) -> ndarray:
     actuation = zeros( (Turtlebot.actuation_size,) )
 
-    max_linear_speed = 0.65
-    max_angular_speed = pi
+    actuation[ 0 ] = ros_actuation.linear.x
+    actuation[ 1 ] = ros_actuation.angular.z
 
-    actuation[ 0 ] = actuation.linear.x
-    actuation[ 1 ] = actuation.angular.z
-
-    if actuation[ 0 ] > max_linear_speed:
-      actuation[ 0 ] = max_linear_speed
-    elif actuation[ 0 ] < -max_linear_speed:
-      actuation[ 0 ] = -max_linear_speed
-    if actuation[ 1 ] > max_angular_speed:
-      actuation[ 1 ] = max_angular_speed
-    elif actuation[ 1 ] < -max_angular_speed:
-      actuation[ 1 ] = -max_angular_speed
+    if actuation[ 0 ] > TurtlebotROSInterface.max_linear_speed:
+      actuation[ 0 ] = TurtlebotROSInterface.max_linear_speed
+    elif actuation[ 0 ] < -TurtlebotROSInterface.max_linear_speed:
+      actuation[ 0 ] = -TurtlebotROSInterface.max_linear_speed
+    if actuation[ 1 ] > TurtlebotROSInterface.max_angular_speed:
+      actuation[ 1 ] = TurtlebotROSInterface.max_angular_speed
+    elif actuation[ 1 ] < -TurtlebotROSInterface.max_angular_speed:
+      actuation[ 1 ] = -TurtlebotROSInterface.max_angular_speed
 
     return actuation
+
+  @staticmethod
+  def ros_actuation_from_actuation( actuation: ndarray ) -> any:
+    ros_actuation = TurtlebotROSInterface.command_type()
+
+    ros_actuation.linear.x = actuation[ 0 ]
+    ros_actuation.angular.z = actuation[ 1 ]
+
+    return ros_actuation
