@@ -4,7 +4,7 @@ from time import perf_counter
 from numpy import diff, eye, inf, ndarray, zeros
 from scipy.optimize import Bounds, LinearConstraint, minimize, NonlinearConstraint, OptimizeResult
 
-from model import Model
+from models.model import Model
 
 
 class MPC:
@@ -261,7 +261,7 @@ class MPC:
 
 
 def test_1():
-	from bluerov import Bluerov
+	from models.dynamics.bluerov import Bluerov
 	model = Model( Bluerov(), 0.1, zeros( (Bluerov.state_size,) ), zeros( (Bluerov.actuation_size,) ) )
 	for m in MPC.MODEL_TYPE:
 		for o in MPC.OPTIMIZE_ON:
@@ -273,7 +273,7 @@ def test_1():
 
 
 def test_2():
-	from bluerov import Bluerov
+	from models.dynamics.bluerov import Bluerov
 	model = Model( Bluerov(), 0.1, zeros( (Bluerov.state_size,) ), zeros( (Bluerov.actuation_size,) ) )
 	mpc = MPC( model, 10, zeros( (10, 6) ), verbose = True )
 

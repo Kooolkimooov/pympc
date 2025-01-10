@@ -2,7 +2,7 @@ from time import perf_counter
 
 from numpy import ndarray, zeros
 
-from model import Model
+from models.model import Model
 
 
 class VS:

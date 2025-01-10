@@ -1,9 +1,9 @@
 from numpy import dot, ndarray, r_, zeros
 from numpy.linalg import norm
 
-from bluerov import BluerovXYZPsi as Bluerov, USV
+from models.dynamics.bluerov import BluerovXYZPsi as Bluerov, USV
 from catenary import Catenary
-from mpc import MPC
+from controllers.mpc import MPC
 from seafloor import Seafloor
 
 

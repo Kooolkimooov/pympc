@@ -3,32 +3,38 @@ from warnings import simplefilter
 from numpy import dot, ndarray, r_, zeros
 from numpy.linalg import norm
 
-from bluerov import Bluerov
+from models.dynamics.bluerov import BluerovXYZPsi as Bluerov
 from catenary import Catenary
+from seafloor import Seafloor
 
 simplefilter( 'ignore', RuntimeWarning )
 
 
-class ChainOf2:
+class ChainOf3WithFixedPoint:
 
-	state_size = 2 * Bluerov.state_size
+	state_size = 3 * Bluerov.state_size
 	actuation_size = 2 * Bluerov.actuation_size
 
 	def __init__(
 			self,
-			water_surface_depth: float = 0.,
-			water_current: ndarray = None,
-			cables_length: float = 3.,
-			cables_linear_mass: float = 0.,
-			get_cable_parameter_method = 'runtime'
+			water_surface_depth: float,
+			water_current: ndarray,
+			seafloor: Seafloor,
+			cables_length: float,
+			cables_linear_mass: float,
+			get_cable_parameter_method
 			):
 
 		self.br_0 = Bluerov( water_surface_depth, water_current )
 		self.c_01 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method )
 		self.br_1 = Bluerov( water_surface_depth, water_current )
+		self.c_12 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method )
 
-		self.last_perturbation_0 = zeros( (Bluerov.pose_size,) )
-		self.last_perturbation_1 = zeros( (Bluerov.pose_size,) )
+		self.sf = seafloor
+
+		self.last_perturbation_01_0 = zeros( (Bluerov.pose_size,) )
+		self.last_perturbation_01_1 = zeros( (Bluerov.pose_size,) )
+		self.last_perturbation_12_1 = zeros( (Bluerov.pose_size,) )
 
 		self.br_0_pose = slice( 0, 6 )
 		self.br_0_position = slice( 0, 3 )
@@ -75,12 +81,15 @@ class ChainOf2:
 		perturbation_01_0, perturbation_01_1 = self.c_01.get_perturbations(
 				state[ self.br_0_position ], state[ self.br_1_position ]
 				)
+		perturbation_12_1, _ = self.c_12.get_perturbations(
+				state[ self.br_0_position ], state[ self.br_1_position ]
+				)
 
 		# if the cable is taunt the perturbation is None
 		# here we should consider any pair with a taunt cable as a single body
 		if perturbation_01_0 is not None:
-			self.last_perturbation_0[ :3 ] = perturbation_01_0
-			self.last_perturbation_1[ :3 ] = perturbation_01_1
+			self.last_perturbation_01_0[ :3 ] = perturbation_01_0
+			self.last_perturbation_01_1[ :3 ] = perturbation_01_1
 		else:
 			perturbation_01_0, perturbation_01_1 = self.get_taunt_cable_perturbations( state, actuation, 0 )
 
@@ -110,10 +119,24 @@ class ChainOf2:
 				br_0 = self.br_0
 				c_01 = self.c_01
 				br_1 = self.br_1
-				br_0_state = self.br_0_state
-				br_0_position = self.br_0_position
-				br_0_orientation = self.br_0_orientation
-				br_0_actuation = self.br_0_actuation
+				br_0_state = state[ self.br_0_state ]
+				br_0_position = state[ self.br_0_position ]
+				br_0_orientation = state[ self.br_0_orientation ]
+				br_0_actuation = actuation[ self.br_0_actuation ]
+				br_0_perturbation = self.last_perturbation_0
+				br_1_state = state[ self.br_1_state ]
+				br_1_position = state[ self.br_1_position ]
+				br_1_orientation = state[ self.br_1_orientation ]
+				br_1_actuation = actuation[ self.br_1_actuation ]
+				br_1_perturbation = self.last_perturbation_1
+			case 1:
+				br_0 = self.br_1
+				c_01 = self.c_12
+				br_1 = self.br_2
+				br_0_state = state[self.br_0_state]
+				br_0_position = state[self.br_0_position]
+				br_0_orientation = state[self.br_0_orientation]
+				br_0_actuation = [self.br_0_actuation]
 				br_0_perturbation = self.last_perturbation_0
 				br_1_state = self.br_1_state
 				br_1_position = self.br_1_position
@@ -124,13 +147,13 @@ class ChainOf2:
 				raise RuntimeError( f'unknown {pair=}' )
 
 		# from br_0 to br_1
-		direction = state[ br_1_position ] - state[ br_0_position ]
+		direction = br_1_position - br_0_position
 		direction /= norm( direction )
 
 		null = zeros( (br_0.pose_size,) )
 
-		br_0_transformation_matrix = br_0.build_transformation_matrix( *state[ br_0_orientation ] )
-		br_1_transformation_matrix = br_1.build_transformation_matrix( *state[ br_1_orientation ] )
+		br_0_transformation_matrix = br_0.build_transformation_matrix( *br_0_orientation )
+		br_1_transformation_matrix = br_1.build_transformation_matrix( *br_1_orientation )
 
 		# in robot frame
 		br_0_acceleration = br_0( state[ br_0_state ], actuation[ br_0_actuation ], null )[ 6: ]

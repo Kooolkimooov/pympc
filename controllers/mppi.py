@@ -5,8 +5,8 @@ from numpy import array, average, diff, exp, eye, inf, ndarray, ones, random, ze
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 from scipy.optimize._differentialevolution import _ConstraintWrapper
 
-from model import Model
-from mpc import MPC
+from models.model import Model
+from controllers.mpc import MPC
 
 
 class MPPI( MPC ):
@@ -196,7 +196,7 @@ class MPPI( MPC ):
 
 
 if __name__ == '__main__':
-	from bluerov import Bluerov
+	from models.dynamics.bluerov import Bluerov
 	from utils import generate_trajectory
 	from numpy import set_printoptions, logspace
 	import matplotlib.pyplot as plt
