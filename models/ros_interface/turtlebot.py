@@ -12,7 +12,7 @@ class TurtlebotROSInterface( BaseInterface ):
   initial_state = zeros( (3,) )
 
   @staticmethod
-  def pose_from_state( state: ndarray ) -> Pose:
+  def ros_pose_from_state( state: ndarray ) -> Pose:
     pose = Pose()
     pose.position.x = state[ 0 ]
     pose.position.y = state[ 1 ]
@@ -26,7 +26,7 @@ class TurtlebotROSInterface( BaseInterface ):
     return pose
 
   @staticmethod
-  def actuation_from_ros( actuation ) -> ndarray:
+  def actuation_from_ros_actuation( actuation ) -> ndarray:
     actuation = zeros( (Turtlebot.actuation_size,) )
 
     max_linear_speed = 0.65

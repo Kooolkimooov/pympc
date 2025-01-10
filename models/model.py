@@ -3,7 +3,7 @@ from copy import deepcopy
 from numpy import ndarray
 
 
-def rungeKutta4(
+def runge_kutta_4(
     function: callable, time_step: float, current_state: ndarray, *args, **kwargs
     ):
   """
@@ -72,7 +72,7 @@ class Model:
     integrates the system one time step. record the state and actuation if record is True
     """
 
-    self.state = rungeKutta4( self.dynamics, self.time_step, self.state, self.actuation )
+    self.state = runge_kutta_4( self.dynamics, self.time_step, self.state, self.actuation )
 
     if self.record:
       self.previous_states.append( deepcopy( self.state ) )

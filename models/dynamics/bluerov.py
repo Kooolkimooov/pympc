@@ -109,7 +109,7 @@ class Bluerov:
 
   @staticmethod
   def build_inertial_matrix(
-      mass: float, center_of_mass: ndarray, inertial_coefficients: list[ float ]
+      mass: float, center_of_mass: ndarray, inertial_coefficients: list
       ) -> ndarray:
     inertial_matrix = eye( 6 )
     for i in range( 3 ):

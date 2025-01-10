@@ -57,7 +57,7 @@ class Logger:
 
 
 def generate_trajectory(
-    key_frames: list[ tuple[ float, list ] ], n_points: int
+    key_frames: list, n_points: int
     ):
   assert key_frames[ 0 ][ 0 ] == 0., "trajectory doesn't start at t = 0."
 
