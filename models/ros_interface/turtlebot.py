@@ -30,8 +30,7 @@ class TurtlebotROSInterface( BaseInterface ):
 
   @staticmethod
   def pose_from_ros_pose( ros_pose: Pose ) -> ndarray:
-    # TODO: fix that
-    pose = zeros( (6,) )
+    pose = zeros( (Turtlebot.pose_size,) )
     pose[ 0 ] = ros_pose.position.x
     pose[ 1 ] = ros_pose.position.y
     pose[ 2 ] = Rotation.from_quat(
