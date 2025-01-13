@@ -71,7 +71,7 @@ class Bluerov:
     if perturbation is None:
       perturbation = zeros( (6,) )
 
-    self.buoyancy[ 2 ] = rho_eau * G * self.volume * (self.vertical_multiplier * .5 - .5 / (1 + exp(
+    self.buoyancy[ 2 ] = self.vertical_multiplier * rho_eau * G * self.volume * (1. - .5 / (1 + exp(
         10. * (self.water_surface_depth - state[ 2 ]) + 1.
         )))
 
