@@ -39,7 +39,7 @@ class TurtlebotROSInterface( BaseInterface ):
     return pose
 
   @staticmethod
-  def actuation_from_ros_actuation( ros_actuation ) -> ndarray:
+  def actuation_from_ros_actuation( ros_actuation: any ) -> ndarray:
     actuation = zeros( (Turtlebot.actuation_size,) )
 
     actuation[ 0 ] = ros_actuation.linear.x

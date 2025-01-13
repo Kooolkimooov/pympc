@@ -57,7 +57,7 @@ class BluerovROSInterface( BaseInterface ):
     return int( value ) * BluerovROSInterface.half_range + BluerovROSInterface.neutral_pwm
 
   @staticmethod
-  def actuation_from_ros_actuation( ros_actuation ) -> ndarray:
+  def actuation_from_ros_actuation( ros_actuation: any ) -> ndarray:
     actuation = zeros( (Bluerov.actuation_size,) )
 
     force = BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G

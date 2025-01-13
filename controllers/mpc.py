@@ -28,7 +28,7 @@ class MPC:
       bounds: tuple = None,
       constraints: tuple = None,
       pose_weight_matrix: ndarray = None,
-      actuation_derivative_weight_matrix: ndarray = None,
+      actuation_weight_matrix: ndarray = None,
       objective_weight: float = 0.,
       final_weight: float = 0.,
       record: bool = False,
@@ -50,7 +50,7 @@ class MPC:
     :param constraints: constraints for the optimization variables
     :param pose_weight_matrix: weight matrix for the pose error; shape: (state_dim//2,
     state_dim//2)
-    :param actuation_derivative_weight_matrix: weight matrix for the actuation derivative; shape:
+    :param actuation_weight_matrix: weight matrix for the actuation derivative; shape:
     (actuation_dim, actuation_dim)
     :param objective_weight: weight for the objective function
     :param final_weight: weight for the final pose error
@@ -73,10 +73,10 @@ class MPC:
 
     if optimize_on == 'actuation_derivative':
       self.get_actuation = self._get_actuation_from_derivative
-      self.get_result = self._get_result_from_derivative
+      self.get_result = self._compute_result_from_derivative
     elif optimize_on == 'actuation':
       self.get_actuation = self._get_actuation_from_actual
-      self.get_result = self._get_result_from_actual
+      self.get_result = self._compute_result_from_actual
     else:
       raise ValueError( f'optimize_on must be one of {self.OPTIMIZE_ON}' )
 
@@ -104,7 +104,7 @@ class MPC:
     self.pose_weight_matrix: ndarray = zeros(
         (self.horizon, self.model.state.shape[ 0 ] // 2, self.model.state.shape[ 0 ] // 2)
         )
-    self.actuation_derivative_weight_matrix: ndarray = zeros(
+    self.actuation_weight_matrix: ndarray = zeros(
         (self.horizon, self.result_shape[ 2 ], self.result_shape[ 2 ])
         )
 
@@ -113,10 +113,10 @@ class MPC:
     else:
       self.pose_weight_matrix[ : ] = pose_weight_matrix
 
-    if actuation_derivative_weight_matrix is None:
-      self.actuation_derivative_weight_matrix[ : ] = eye( self.result_shape[ 2 ] )
+    if actuation_weight_matrix is None:
+      self.actuation_weight_matrix[ : ] = eye( self.result_shape[ 2 ] )
     else:
-      self.actuation_derivative_weight_matrix[ : ] = actuation_derivative_weight_matrix
+      self.actuation_weight_matrix[ : ] = actuation_weight_matrix
 
     self.objective_weight = objective_weight
     self.final_weight = final_weight
@@ -132,10 +132,11 @@ class MPC:
 
     self.verbose = verbose
 
-  def compute_actuation( self ):
+  def compute_actuation( self ) -> ndarray:
     """
     computes the best actuation for the current state with a given horizon. records the computation
-    time if record is True
+    time if record is True and returns the best actuation
+    :return: best actuation
     """
 
     if self.record:
@@ -165,7 +166,10 @@ class MPC:
 
     return self.result
 
-  def get_result( self ):
+  def compute_result( self ):
+    """
+    computes the best actuation from scipy.optimize raw result and store it in self.result
+    """
     raise NotImplementedError( 'predict method should have been implemented in __init__' )
 
   def cost( self, candidate: ndarray ) -> float:
@@ -185,7 +189,7 @@ class MPC:
     error = predicted_trajectory - self.target_trajectory[
                                    :self.horizon * self.time_step_prediction_factor:self.time_step_prediction_factor ]
     cost += (error @ self.pose_weight_matrix @ error.transpose( (0, 2, 1) )).sum()
-    cost += (actuation_derivatives @ self.actuation_derivative_weight_matrix @ actuation_derivatives.transpose(
+    cost += (actuation_derivatives @ self.actuation_weight_matrix @ actuation_derivatives.transpose(
         (0, 2, 1)
         )).sum()
     cost += 0. if self.objective is None else self.objective_weight * self.objective(
@@ -218,7 +222,7 @@ class MPC:
   def get_actuation( self, candidate: ndarray ) -> tuple:
     raise NotImplementedError( 'predict method should have been implemented in __init__' )
 
-  def get_objective( self ):
+  def get_objective( self ) -> float:
     actuation, _ = self.get_actuation( self.raw_result.x )
     prediction = self.predict( actuation )
     return self.objective( prediction, actuation )
@@ -247,15 +251,15 @@ class MPC:
 
   def _get_actuation_from_actual( self, candidate: ndarray ) -> tuple:
     actuation = candidate.reshape( self.result_shape )
-    actuation_derivatives = diff( actuation, prepend = [ [ self.model.actuation ] ], axis = 0 ) / self.time_step
     actuation = actuation.repeat( self.time_steps_per_actuation, axis = 0 )
+    actuation_derivatives = diff( actuation, prepend = [ [ self.model.actuation ] ], axis = 0 ) / self.time_step
     actuation = actuation[ :self.horizon ]
 
     return actuation, actuation_derivatives
 
-  def _get_result_from_derivative( self ):
+  def _compute_result_from_derivative( self ):
     self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0 ] * self.model.time_step + self.model.actuation
 
-  def _get_result_from_actual( self ):
+  def _compute_result_from_actual( self ):
     self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0 ]
 
