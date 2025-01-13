@@ -16,15 +16,24 @@ class Bluerov:
   actuation_size = 6
   linear_actuation_size = 3
 
-  def __init__( self, water_surface_depth: float = 0., water_current: ndarray = None ):
+  REFERENCE_FRAME = [ 'NED', 'ENU' ]
+
+  def __init__( self, water_surface_depth: float = 0., water_current: ndarray = None, reference_frame: str = 'NED' ):
+
+    if reference_frame == 'NED':
+      self.vertical_multiplier = -1.
+    elif reference_frame == 'ENU':
+      self.vertical_multiplier = 1.
+    else:
+      raise ValueError( f'reference_frame must be one of {self.REFERENCE_FRAME}' )
 
     self.mass = 11.5
     self.center_of_mass = array( [ 0.0, 0.0, 0.0 ] )
-    self.weight = array( [ 0., 0., self.mass * G ] )
+    self.weight = -self.vertical_multiplier * array( [ 0., 0., self.mass * G ] )
 
     self.volume = 0.0134
     self.center_of_volume = array( [ 0.0, 0.0, -0.01 ] )
-    self.buoyancy = -array( [ 0., 0., rho_eau * G * self.volume ] )
+    self.buoyancy = self.vertical_multiplier * array( [ 0., 0., rho_eau * G * self.volume ] )
 
     self.water_surface_depth = water_surface_depth
 
@@ -62,7 +71,7 @@ class Bluerov:
     if perturbation is None:
       perturbation = zeros( (6,) )
 
-    self.buoyancy[ 2 ] = rho_eau * G * self.volume * (-.5 - .5 / (1 + exp(
+    self.buoyancy[ 2 ] = rho_eau * G * self.volume * (self.vertical_multiplier * .5 - .5 / (1 + exp(
         10. * (self.water_surface_depth - state[ 2 ]) + 1.
         )))
 
