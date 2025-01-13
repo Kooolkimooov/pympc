@@ -9,7 +9,7 @@ from ..dynamics.turtlebot import Turtlebot
 class TurtlebotROSInterface( BaseInterface ):
 
   command_type = Twist
-  initial_state = zeros( (3,) )
+  initial_state = zeros( (6,) )
 
   max_linear_speed = 0.65
   max_angular_speed = pi
