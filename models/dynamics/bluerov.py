@@ -28,11 +28,11 @@ class Bluerov:
       raise ValueError( f'reference_frame must be one of {self.REFERENCE_FRAME}' )
 
     self.mass = 11.5
-    self.center_of_mass = array( [ 0.0, 0.0, 0.0 ] )
+    self.center_of_mass = self.vertical_multiplier * array( [ 0.0, 0.0, 0.0 ] )
     self.weight = -self.vertical_multiplier * array( [ 0., 0., self.mass * G ] )
 
     self.volume = 0.0134
-    self.center_of_volume = array( [ 0.0, 0.0, -0.01 ] )
+    self.center_of_volume = self.vertical_multiplier * array( [ 0.0, 0.0, 0.01 ] )
     self.buoyancy = self.vertical_multiplier * array( [ 0., 0., rho_eau * G * self.volume ] )
 
     self.water_surface_depth = water_surface_depth
@@ -47,7 +47,7 @@ class Bluerov:
     self.water_current = water_current
 
     self.inertial_coefficients = [ .26, .23, .37, 0., 0., 0. ]
-    self.hydrodynamic_coefficients = [ 13.7, 0., 33.0, 0., 0.8, 0. ]
+    self.hydrodynamic_coefficients = [ 13.7, 13.7, 33.0, 0.8, 0.8, 0.8 ]
     self.added_mass_coefficients = [ 6.36, 7.12, 18.68, .189, .135, .222 ]
 
     self.inertial_matrix = self.build_inertial_matrix(
