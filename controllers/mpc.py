@@ -166,7 +166,7 @@ class MPC:
 
     return self.result
 
-  def compute_result( self ):
+  def get_result( self ):
     """
     computes the best actuation from scipy.optimize raw result and store it in self.result
     """
