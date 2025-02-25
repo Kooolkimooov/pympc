@@ -6,7 +6,6 @@ from scipy.optimize import minimize, OptimizeResult
 
 from ..models.model import Model
 
-
 class MPC:
 
   MODEL_TYPE = [ 'linear', 'nonlinear' ]
@@ -73,10 +72,10 @@ class MPC:
 
     if optimize_on == 'actuation_derivative':
       self.get_actuation = self._get_actuation_from_derivative
-      self.get_result = self._compute_result_from_derivative
+      self.compute_result = self._compute_result_from_derivative
     elif optimize_on == 'actuation':
       self.get_actuation = self._get_actuation_from_actual
-      self.get_result = self._compute_result_from_actual
+      self.compute_result = self._compute_result_from_actual
     else:
       raise ValueError( f'optimize_on must be one of {self.OPTIMIZE_ON}' )
 
@@ -159,14 +158,14 @@ class MPC:
       self.compute_times.append( perf_counter() - ti )
 
     if self.raw_result.success:
-      self.get_result()
+      self.compute_result()
     elif self.best_cost < inf:
       self.raw_result.x = self.best_candidate
-      self.get_result()
+      self.compute_result()
 
     return self.result
 
-  def get_result( self ):
+  def compute_result( self ):
     """
     computes the best actuation from scipy.optimize raw result and store it in self.result
     """
@@ -231,7 +230,6 @@ class MPC:
 
     p_state = deepcopy( self.model.state )
     predicted_trajectory = zeros( (self.horizon, 1, self.model.state.shape[ 0 ]) )
-
     for i in range( self.horizon ):
       p_state += self.model.dynamics( p_state, actuation[ i, 0 ] ) * self.time_step * self.time_step_prediction_factor
       predicted_trajectory[ i ] = p_state

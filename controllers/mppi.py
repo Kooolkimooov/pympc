@@ -174,7 +174,7 @@ class MPPI( MPC ):
     if self.record:
       self.compute_times.append( perf_counter() - ti )
 
-    self.get_result()
+    self.compute_result()
     return self.result
 
   def get_actuation( self, candidate: ndarray ) -> tuple[ ndarray, ndarray ]:
@@ -187,7 +187,7 @@ class MPPI( MPC ):
 
     return actuation, actuation_derivatives
 
-  def get_result( self ):
+  def compute_result( self ):
     self.result = self.raw_result[ 0 ].reshape( self.model.actuation.shape ) + self.model.actuation
 
   def add_constraint( self, constraint: Bounds | LinearConstraint | NonlinearConstraint ):
