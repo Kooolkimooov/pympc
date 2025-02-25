@@ -1,16 +1,16 @@
-from copy import deepcopy
 from time import perf_counter
 
-from numpy import eye, inf, ndarray, zeros
+from numpy import eye, ndarray, zeros
 from scipy.optimize import minimize, OptimizeResult
+
 
 class PP:
 
   def __init__(
       self,
       current_pose: ndarray,
-      target: ndarray,
       horizon: int,
+      target: ndarray = None,
       objective: callable = None,
       time_step: float = .01,
       guess_from_last_solution: bool = True,
@@ -25,7 +25,7 @@ class PP:
       verbose: bool = False
       ):
     """
-    :param horizon: prediction horizon
+    :param horizon: planning horizon
     :param target: target
     :param objective: objective function, must have the following signature: f(path)
     :param time_step:time step
@@ -43,7 +43,9 @@ class PP:
     """
 
     self.current_pose = current_pose
-    self.target = target.reshape((1, 1, target.shape[0])).repeat(horizon, axis=0)
+    self.target = target.reshape( (1, 1, target.shape[ 0 ]) ).repeat(
+        horizon, axis = 0
+        ) if not target is None else zeros( (horizon, 1, current_pose.shape[ 0 ]) )
     self.horizon = horizon
     self.objective = objective
 
@@ -55,16 +57,18 @@ class PP:
     self.bounds = bounds
     self.constraints = constraints
 
-    self.result_shape = ( self.horizon, 1, self.current_pose.shape[ 0 ] )
+    self.result_shape = (self.horizon, 1, self.current_pose.shape[ 0 ])
 
     self.raw_result = OptimizeResult( x = zeros( self.result_shape ) )
     self.result = zeros( self.result_shape )
 
     self.pose_weight_matrix: ndarray = zeros(
-        (self.horizon, self.current_pose.shape[0], self.current_pose.shape[ 0 ] )
+        (self.horizon, self.current_pose.shape[ 0 ], self.current_pose.shape[ 0 ])
         )
 
-    if pose_weight_matrix is None:
+    if pose_weight_matrix is None and target is None:
+      self.pose_weight_matrix[ : ] = zeros( (self.current_pose.shape[ 0 ], self.current_pose.shape[ 0 ]) )
+    elif pose_weight_matrix is None:
       self.pose_weight_matrix[ : ] = eye( self.current_pose.shape[ 0 ] )
     else:
       self.pose_weight_matrix[ : ] = pose_weight_matrix
@@ -119,7 +123,7 @@ class PP:
     """
     computes the best actuation from scipy.optimize raw result and store it in self.result
     """
-    self.result = self.raw_result.x.copy()
+    self.result = self.raw_result.x.copy().reshape( self.result_shape )
 
   def cost( self, candidate: ndarray ) -> float:
     """
@@ -127,7 +131,7 @@ class PP:
     :param candidate: proposed actuation derivative over the horizon
     :return: cost
     """
-    
+
     cost = 0.
 
     path = candidate.reshape( self.result_shape )
@@ -153,26 +157,49 @@ class PP:
 
 
 if __name__ == "__main__":
-  from numpy import ones, diff
+  from numpy import ones, diff, linspace, inf, set_printoptions
+  from numpy.linalg import norm
   from scipy.optimize import NonlinearConstraint
 
-  def constraint(self: PP, path: ndarray) -> ndarray:
-    nf_path = path.reshape(self.result_shape)
-    return diff(nf_path, prepend=[[self.current_pose]], axis=0).flatten()
-  
-  ub = 0.05 * ones((10, 1, 6))
-  lb = -ub
+  set_printoptions( precision = 3, linewidth = 10000, suppress = True )
 
   o = PP(
-      current_pose = zeros( 6 ),
-      target = ones( 6 ),
-      horizon = 10,
-      record=True
+      current_pose = zeros( 6 ), horizon = 10, record = True
       )
-  
-  o.constraints_function = constraint.__get__( o, PP )
-  o.constraints = NonlinearConstraint(o.constraints_function, lb.flatten(), ub.flatten())
+
+
+  def speed_constraint( self: PP, path: ndarray ) -> ndarray:
+    nf_path = path.reshape( self.result_shape )
+    return diff( nf_path, prepend = [ [ self.current_pose ] ], axis = 0 ).flatten()
+
+
+  speed_ub = 0.2 * ones( (10, 1, 6) )
+  speed_lb = -speed_ub
+
+  o.speed_constraint_function = speed_constraint.__get__( o, PP )
+
+  leader_path = linspace( [ [ 1, 0, 0, 0, 0, 0 ] ], [ [ 3, 0, 0, 0, 0, 0 ] ], 10 )
+
+
+  def inter_robot_constraint( self: PP, path: ndarray ) -> ndarray:
+    nf_path = path.reshape( self.result_shape )
+    distance = norm( nf_path[ :, :, :3 ] - leader_path[ :, :, :3 ], axis = 2 )
+    return distance.flatten()
+
+
+  inter_robot_constraint_ub = 1. * ones( (10, 1, 1) )
+  inter_robot_constraint_lb = zeros( (10, 1, 1) )
+
+  o.inter_robot_constraint_function = inter_robot_constraint.__get__( o, PP )
+
+  o.constraints = (NonlinearConstraint(
+      o.speed_constraint_function, speed_lb.flatten(), speed_ub.flatten()
+      ), NonlinearConstraint(
+      o.inter_robot_constraint_function, inter_robot_constraint_lb.flatten(), inter_robot_constraint_ub.flatten()
+      ),)
 
   o.compute_path()
-  print(o.result)
-  print(o.compute_times)
+  print( o.raw_result )
+  print( o.result.T )
+  print( o.compute_times )
+  print( o.inter_robot_constraint_function( o.result ) )
