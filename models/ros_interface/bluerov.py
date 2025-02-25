@@ -1,4 +1,4 @@
-from numpy import ndarray, zeros
+from numpy import ndarray, zeros, array
 from scipy.spatial.transform import Rotation
 
 from geometry_msgs.msg import Pose
@@ -6,6 +6,8 @@ from mavros_msgs.msg import OverrideRCIn
 from .base_interface import BaseInterface
 from ..dynamics.bluerov import Bluerov
 from ...utils import G
+
+import rospy
 
 
 class BluerovROSInterface( BaseInterface ):
@@ -20,6 +22,18 @@ class BluerovROSInterface( BaseInterface ):
   neutral_pwm = 1500
   half_range = 400
   distance_from_com = 0.1
+
+  @staticmethod
+  def get_max_actuation() -> ndarray:
+    max_actuation = array([
+        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.cos_angle,
+        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.cos_angle,
+        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G,
+        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.distance_from_com,
+        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.distance_from_com,
+        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.distance_from_com
+        ])
+    return max_actuation
 
   @staticmethod
   def ros_pose_from_state( state: ndarray ) -> Pose:
@@ -53,8 +67,9 @@ class BluerovROSInterface( BaseInterface ):
     return (value - BluerovROSInterface.neutral_pwm) / BluerovROSInterface.half_range
 
   @staticmethod
-  def normalized_to_pwn( value: float ) -> int:
-    return int( value ) * BluerovROSInterface.half_range + BluerovROSInterface.neutral_pwm
+  def normalized_to_pwm( value: float ) -> int:
+    pwm = int( value * BluerovROSInterface.half_range ) + BluerovROSInterface.neutral_pwm
+    return pwm
 
   @staticmethod
   def actuation_from_ros_actuation( ros_actuation: any ) -> ndarray:
@@ -81,11 +96,11 @@ class BluerovROSInterface( BaseInterface ):
     angle = force * BluerovROSInterface.cos_angle
     lever = force * BluerovROSInterface.distance_from_com
 
-    ros_actuation.channels[ 4 ] = BluerovROSInterface.pwm_to_normalized( actuation[ 0 ] / angle )
-    ros_actuation.channels[ 5 ] = BluerovROSInterface.pwm_to_normalized( actuation[ 1 ] / angle )
-    ros_actuation.channels[ 2 ] = BluerovROSInterface.pwm_to_normalized( actuation[ 2 ] / force )
-    ros_actuation.channels[ 1 ] = BluerovROSInterface.pwm_to_normalized( actuation[ 3 ] / lever )
-    ros_actuation.channels[ 0 ] = BluerovROSInterface.pwm_to_normalized( actuation[ 4 ] / lever )
-    ros_actuation.channels[ 3 ] = BluerovROSInterface.pwm_to_normalized( actuation[ 5 ] / lever )
+    ros_actuation.channels[ 4 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 0 ] / angle )
+    ros_actuation.channels[ 5 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 1 ] / angle )
+    ros_actuation.channels[ 2 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 2 ] / force )
+    ros_actuation.channels[ 1 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 3 ] / lever )
+    ros_actuation.channels[ 0 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 4 ] / lever )
+    ros_actuation.channels[ 3 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 5 ] / lever )
 
     return ros_actuation
