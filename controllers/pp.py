@@ -1,6 +1,6 @@
 from time import perf_counter
 
-from numpy import eye, ndarray, zeros
+from numpy import eye, ndarray, zeros, inf
 from scipy.optimize import minimize, OptimizeResult
 
 
@@ -157,7 +157,7 @@ class PP:
 
 
 if __name__ == "__main__":
-  from numpy import ones, diff, linspace, inf, set_printoptions
+  from numpy import ones, diff, linspace, set_printoptions
   from numpy.linalg import norm
   from scipy.optimize import NonlinearConstraint
 
