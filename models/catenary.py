@@ -55,7 +55,7 @@ class Catenary:
     else:
       raise ValueError( f'reference_frame must be one of {self.REFERENCE_FRAME}' )
 
-  def __call__( self, p0: ndarray, p1: ndarray ):
+  def __call__( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
     get all relevant data on the catenary of length self.length, linear mass self.linear_mass, and the given
     attachment points
@@ -90,7 +90,7 @@ class Catenary:
     C, H, dH, D, dD = self.get_parameters( p0, p1 )
     return self._get_lowest_point( p0, p1, C, H, dH, D, dD )
 
-  def get_perturbations( self, p0: ndarray, p1: ndarray ):
+  def get_perturbations( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
     get the perturbations of the catenary on the two points
     :param p0: one end of the catenary
@@ -116,7 +116,7 @@ class Catenary:
   def optimization_function( C, length, dH, two_D_plus_dD ):
     raise NotImplementedError( 'optimization_function method should have been implemented in __init__' )
 
-  def get_parameters( self, p0: ndarray, p1: ndarray ) -> tuple[ float, float, float, float, float ]:
+  def get_parameters( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
     :param p0: first attachment point
     :param p1: second attachment point
@@ -129,7 +129,7 @@ class Catenary:
     """
     raise NotImplementedError( 'get_parameters method should have been implemented in __init__' )
 
-  def _get_parameters_runtime( self, p0: ndarray, p1: ndarray ) -> tuple[ float, float, float, float, float ]:
+  def _get_parameters_runtime( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
     implementation of get_parameters using optimization
     """
@@ -183,7 +183,7 @@ class Catenary:
     with open( Path( f'./cache/Catenary/{self.length}.json' ), 'w' ) as file:
       dump( self._Cs.tolist(), file )
 
-  def _get_parameters_precompute( self, p0: ndarray, p1: ndarray ) -> tuple[ float, float, float, float, float ]:
+  def _get_parameters_precompute( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
     implementation of get_parameters using precomputed values
     """
@@ -220,7 +220,16 @@ class Catenary:
 
     return C, H, dH, D, dD
 
-  def _get_lowest_point( self, p0: ndarray, p1: ndarray, C: float, H: float, dH: float, D: float, dD: float ):
+  def _get_lowest_point(
+      self,
+      p0: ndarray,
+      p1: ndarray,
+      C: float,
+      H: float,
+      dH: float,
+      D: float,
+      dD: float
+      ) -> ndarray:
 
     # case where horizontal distance is too small
     if (C is None) and (H is not None):
@@ -236,7 +245,7 @@ class Catenary:
 
   def _get_perturbations(
       self, p0: ndarray, p1: ndarray, C: float, H: float, dH: float, D: float, dD: float
-      ) -> tuple[ ndarray, ndarray ]:
+      ) -> tuple:
 
     # case where horizontal distance is too small
     if (C is None) and (D is not None):
@@ -292,11 +301,11 @@ class Catenary:
     return points
 
   @staticmethod
-  def _optimization_function_0( C, length, dH, two_D_plus_dD ):
+  def _optimization_function_0( C, length, dH, two_D_plus_dD ) -> float:
     return C * C * (length * length - dH * dH) - 2.0 * (-1.0 + cosh( C * two_D_plus_dD ))
 
   @staticmethod
-  def _optimization_function_1( C, length, dH, two_D_plus_dD ):
+  def _optimization_function_1( C, length, dH, two_D_plus_dD ) -> float:
     return pow( length, 2 ) - pow( dH, 2 ) - pow( 2 * sinh( C * two_D_plus_dD / 2 ) / C, 2 )
 
 
