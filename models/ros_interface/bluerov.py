@@ -96,6 +96,8 @@ class BluerovROSInterface( BaseInterface ):
     angle = force * BluerovROSInterface.cos_angle
     lever = force * BluerovROSInterface.distance_from_com
 
+    # TODO: clamp here
+
     ros_actuation.channels[ 4 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 0 ] / angle )
     ros_actuation.channels[ 5 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 1 ] / angle )
     ros_actuation.channels[ 2 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 2 ] / force )
