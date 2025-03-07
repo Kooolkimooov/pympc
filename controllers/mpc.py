@@ -161,6 +161,7 @@ class MPC:
       self.compute_result()
     elif self.best_cost < inf:
       self.raw_result.x = self.best_candidate
+      self.best_cost = inf
       self.compute_result()
 
     return self.result
