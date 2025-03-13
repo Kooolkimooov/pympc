@@ -1,19 +1,17 @@
-from numpy import ndarray, zeros, array
-from scipy.spatial.transform import Rotation
-
 from geometry_msgs.msg import Pose
 from mavros_msgs.msg import OverrideRCIn
-from .base_interface import BaseInterface
-from ..dynamics.bluerov import Bluerov
-from ...utils import G
+from numpy import array, ndarray, zeros
+from scipy.spatial.transform import Rotation
 
-import rospy
+from pympc.models.dynamics.bluerov import Bluerov
+from pympc.models.ros_interface.interface import Interface
+from pympc.utils import G
 
 
-class BluerovROSInterface( BaseInterface ):
+class BluerovROSInterface( Interface ):
 
-  command_type = OverrideRCIn
-  initial_state = zeros( (Bluerov.state_size,) )
+  _command_type = OverrideRCIn
+  _initial_state = zeros( (Bluerov._state_size,) )
 
   # TODO: refine values
   max_kg_force = 3
@@ -25,24 +23,27 @@ class BluerovROSInterface( BaseInterface ):
 
   @staticmethod
   def get_max_actuation() -> ndarray:
-    max_actuation = array([
-        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.cos_angle,
-        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.cos_angle,
-        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G,
-        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.distance_from_com,
-        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.distance_from_com,
-        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.distance_from_com
-        ])
+    max_actuation = array(
+        [ BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.cos_angle,
+          BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.cos_angle,
+          BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G,
+          BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G *
+          BluerovROSInterface.distance_from_com,
+          BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G *
+          BluerovROSInterface.distance_from_com,
+          BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G *
+          BluerovROSInterface.distance_from_com ]
+        )
     return max_actuation
 
   @staticmethod
   def ros_pose_from_state( state: ndarray ) -> Pose:
     pose = Pose()
-    pose.position.x = state[ 0 ]
-    pose.position.y = state[ 1 ]
-    pose.position.z = state[ 2 ]
+    pose.position.x = state[ Bluerov._position ][ 0 ]
+    pose.position.y = state[ Bluerov._position ][ 1 ]
+    pose.position.z = state[ Bluerov._position ][ 2 ]
 
-    quaternion = Rotation.from_euler( 'xyz', state[ 3:6 ] ).as_quat()
+    quaternion = Rotation.from_euler( 'xyz', state[ Bluerov._orientation ] ).as_quat()
     pose.orientation.x = quaternion[ 0 ]
     pose.orientation.y = quaternion[ 1 ]
     pose.orientation.z = quaternion[ 2 ]
@@ -52,10 +53,10 @@ class BluerovROSInterface( BaseInterface ):
 
   @staticmethod
   def pose_from_ros_pose( ros_pose: Pose ) -> ndarray:
-    pose = zeros( (Bluerov.pose_size,) )
-    pose[ 0 ] = ros_pose.position.x
-    pose[ 1 ] = ros_pose.position.y
-    pose[ 2 ] = ros_pose.position.z
+    pose = zeros( (Bluerov._state_size // 2,) )
+    pose[ Bluerov.position ][ 0 ] = ros_pose.position.x
+    pose[ Bluerov.position ][ 1 ] = ros_pose.position.y
+    pose[ Bluerov.position ][ 2 ] = ros_pose.position.z
     pose[ 3:6 ] = Rotation.from_quat(
         [ ros_pose.orientation.x, ros_pose.orientation.y, ros_pose.orientation.z, ros_pose.orientation.w ]
         ).as_euler( 'xyz' )
@@ -73,12 +74,13 @@ class BluerovROSInterface( BaseInterface ):
 
   @staticmethod
   def actuation_from_ros_actuation( ros_actuation: any ) -> ndarray:
-    actuation = zeros( (Bluerov.actuation_size,) )
+    actuation = zeros( (Bluerov._actuation_size,) )
 
     force = BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G
     angle = force * BluerovROSInterface.cos_angle
     lever = force * BluerovROSInterface.distance_from_com
 
+    # TODO this should use the bluerov configuration
     actuation[ 0 ] = angle * BluerovROSInterface.pwm_to_normalized( ros_actuation.channels[ 4 ] )
     actuation[ 1 ] = angle * BluerovROSInterface.pwm_to_normalized( ros_actuation.channels[ 5 ] )
     actuation[ 2 ] = force * BluerovROSInterface.pwm_to_normalized( ros_actuation.channels[ 2 ] )
@@ -90,13 +92,14 @@ class BluerovROSInterface( BaseInterface ):
 
   @staticmethod
   def ros_actuation_from_actuation( actuation: ndarray ) -> any:
-    ros_actuation = BluerovROSInterface.command_type()
+    ros_actuation = BluerovROSInterface._command_type()
 
     force = BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G
     angle = force * BluerovROSInterface.cos_angle
     lever = force * BluerovROSInterface.distance_from_com
 
     # TODO: clamp here
+    # TODO this should use the bluerov configuration
 
     ros_actuation.channels[ 4 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 0 ] / angle )
     ros_actuation.channels[ 5 ] = BluerovROSInterface.normalized_to_pwm( actuation[ 1 ] / angle )
