@@ -289,14 +289,3 @@ class USV( Bluerov ):
     matrix[ 1, 1 ] = cPsi
 
     return matrix
-
-
-if __name__ == '__main__':
-  # rov = BluerovXYZPsi(reference_frame = 'ENU')
-  rov = BluerovXYZPsi()
-  state = zeros( (rov.state_size,) )
-  actuation = zeros( (rov.actuation_size,) )
-  perturbation = zeros( (rov.perturbation_size,) )
-  for _ in range( 1000 ):
-    state += rov( state, actuation, perturbation ) * 0.01
-    print( f"{state[ rov.position ]=} - {rov.buoyancy+rov.weight=}" )

@@ -32,27 +32,3 @@ class Turtlebot( Dynamics ):
     error[ :, :, 2 ] = (actual[ :, :, 2 ] - target[ :, :, 2 ]) % pi
 
     return error
-
-
-if __name__ == '__main__':
-  turtle_bot = Turtlebot()
-  print( f"{turtle_bot.state_size=}" )
-  print( f"{turtle_bot.actuation_size=}" )
-  print( f"{turtle_bot.position=}" )
-  print( f"{turtle_bot.orientation=}" )
-  print( f"{turtle_bot.velocity=}" )
-  print( f"{turtle_bot.body_rates=}" )
-  print( f"{turtle_bot.linear_actuation=}" )
-  print( f"{turtle_bot.angular_actuation=}" )
-
-  from numpy import ones
-
-  state = zeros( (turtle_bot.state_size,) )
-  actuation = ones( (turtle_bot.actuation_size,) )
-
-  print( f"{turtle_bot(state, actuation)=}" )
-
-  t1 = zeros( (1, 1, turtle_bot.state_size // 2) )
-  t2 = 10 * ones( (1, 1, turtle_bot.state_size // 2) )
-
-  print( turtle_bot.compute_error( t1, t2 ) )
