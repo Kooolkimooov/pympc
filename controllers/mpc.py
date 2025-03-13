@@ -1,10 +1,10 @@
-from copy import deepcopy
 from time import perf_counter
 
 from numpy import diff, eye, inf, ndarray, zeros
 from scipy.optimize import minimize, OptimizeResult
 
-from ..models.model import Model
+from pympc.models.model import Model
+
 
 class MPC:
 
@@ -186,8 +186,11 @@ class MPC:
     prediction = self.predict( actuation )
     predicted_trajectory = prediction[ :, :, :self.model.state.shape[ 0 ] // 2 ]
 
-    error = predicted_trajectory - self.target_trajectory[
-                                   :self.horizon * self.time_step_prediction_factor:self.time_step_prediction_factor ]
+    error = self.model.dynamics.compute_error(
+        predicted_trajectory,
+        self.target_trajectory[ :self.horizon * self.time_step_prediction_factor:self.time_step_prediction_factor ]
+        )
+
     cost += (error @ self.pose_weight_matrix @ error.transpose( (0, 2, 1) )).sum()
     cost += (actuation_derivatives @ self.actuation_weight_matrix @ actuation_derivatives.transpose(
         (0, 2, 1)
@@ -229,11 +232,14 @@ class MPC:
 
   def _predict_non_linear( self, actuation: ndarray ) -> ndarray:
 
-    p_state = deepcopy( self.model.state )
+    state = self.model.state.copy()
+
     predicted_trajectory = zeros( (self.horizon, 1, self.model.state.shape[ 0 ]) )
     for i in range( self.horizon ):
-      p_state += self.model.dynamics( p_state, actuation[ i, 0 ] ) * self.time_step * self.time_step_prediction_factor
-      predicted_trajectory[ i ] = p_state
+      state += self.model.dynamics(
+          state, actuation[ i, 0 ], self.model.perturbation
+          ) * self.time_step * self.time_step_prediction_factor
+      predicted_trajectory[ i ] = state
 
     return predicted_trajectory
 
@@ -261,4 +267,3 @@ class MPC:
 
   def _compute_result_from_actual( self ):
     self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0 ]
-
