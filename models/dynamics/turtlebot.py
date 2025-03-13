@@ -1,6 +1,6 @@
 from numpy import cos, ndarray, pi, sin, zeros
 
-from dynamics import Dynamics
+from pympc.models.dynamics.dynamics import Dynamics
 
 
 class Turtlebot( Dynamics ):
@@ -18,8 +18,7 @@ class Turtlebot( Dynamics ):
   _linear_actuation = 0
   _angular_actuation = 1
 
-  @staticmethod
-  def __call__( state: ndarray, actuation: ndarray ) -> ndarray:
+  def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
     xdot = zeros( (6,) )
     xdot[ 0 ] = cos( state[ 2 ] ) * actuation[ 0 ]
     xdot[ 1 ] = sin( state[ 2 ] ) * actuation[ 0 ]
@@ -27,9 +26,7 @@ class Turtlebot( Dynamics ):
 
     return xdot
 
-  @staticmethod
-  def compute_error( actual: ndarray, target: ndarray ) -> ndarray:
-
+  def compute_error( self, actual: ndarray, target: ndarray ) -> ndarray:
     error = zeros( actual.shape )
     error[ :, :, :2 ] = actual[ :, :, :2 ] - target[ :, :, :2 ]
     error[ :, :, 2 ] = (actual[ :, :, 2 ] - target[ :, :, 2 ]) % pi
@@ -53,7 +50,7 @@ if __name__ == '__main__':
   state = zeros( (turtle_bot.state_size,) )
   actuation = ones( (turtle_bot.actuation_size,) )
 
-  print(f"{turtle_bot(state, actuation)=}" )
+  print( f"{turtle_bot(state, actuation)=}" )
 
   t1 = zeros( (1, 1, turtle_bot.state_size // 2) )
   t2 = 10 * ones( (1, 1, turtle_bot.state_size // 2) )
