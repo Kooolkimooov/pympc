@@ -1,6 +1,5 @@
-from numpy import ndarray
-
 from geometry_msgs.msg import Pose
+from numpy import ndarray
 
 
 class Interface:
@@ -8,7 +7,7 @@ class Interface:
   _initial_state = None
 
   @staticmethod
-  def ros_pose_from_state( state: ndarray ) -> Pose: 
+  def ros_pose_from_state( state: ndarray ) -> Pose:
     """
     converts a numpy array to a ROS Pose message
 
@@ -18,7 +17,7 @@ class Interface:
     raise NotImplementedError()
 
   @staticmethod
-  def pose_from_ros_pose( ros_pose: Pose ) -> ndarray: 
+  def pose_from_ros_pose( ros_pose: Pose ) -> ndarray:
     """
     converts a ROS Pose message to a numpy array
     
@@ -28,7 +27,7 @@ class Interface:
     raise NotImplementedError()
 
   @staticmethod
-  def actuation_from_ros_actuation( ros_actuation: any ) -> ndarray: 
+  def actuation_from_ros_actuation( ros_actuation: any ) -> ndarray:
     """
     converts a ROS message of type command_type to a numpy array
 
@@ -38,7 +37,7 @@ class Interface:
     raise NotImplementedError()
 
   @staticmethod
-  def ros_actuation_from_actuation( actuation: ndarray ) -> any: 
+  def ros_actuation_from_actuation( actuation: ndarray ) -> any:
     """
     converts a numpy array to a ROS message of type command_type
 
@@ -48,14 +47,14 @@ class Interface:
     raise NotImplementedError()
 
   @property
-  def command_type( self ) -> any: 
+  def command_type( self ) -> any:
     """
     The type of the ros message used to send commands to the robot
     """
     return self._command_type
-  
+
   @property
-  def initial_state( self )  -> ndarray:
+  def initial_state( self ) -> ndarray:
     """
     the initial state of the robot
     """

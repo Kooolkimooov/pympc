@@ -22,9 +22,9 @@ class Seafloor:
 
 
 class SeafloorFromFunction( Seafloor ):
-  def __init__( self, function: callable ):
-    assert list( signature( function ).parameters ) == [ 'x', 'y' ], 'provided function has irregular signature'
-    self.seafloor_function = function
+  def __init__( self, seafloor: callable ):
+    assert list( signature( seafloor ).parameters ) == [ 'x', 'y' ], 'provided function has irregular signature'
+    self.seafloor_function = seafloor
 
   def get_distance_to_seafloor( self, point: ndarray ) -> float:
     return self.seafloor_function( *(point[ :2 ]) ) - point[ 2 ]

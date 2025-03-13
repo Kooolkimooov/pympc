@@ -1,6 +1,6 @@
 from time import perf_counter
 
-from numpy import eye, ndarray, zeros, inf
+from numpy import eye, inf, ndarray, zeros
 from scipy.optimize import minimize, OptimizeResult
 
 

@@ -26,7 +26,7 @@ from pympc.utils import check, G
 
 class Catenary:
   """
-  Catenary class with the NED or ENU convention
+  Implementation of the catenary model for a cable
   """
 
   GET_PARAMETER_METHOD = [ 'runtime', 'precompute' ]
@@ -35,6 +35,12 @@ class Catenary:
   def __init__(
       self, length = 3., linear_mass = 1., get_parameter_method: str = 'runtime', reference_frame: str = 'NED'
       ):
+    """
+    :param length: length of the cable
+    :param linear_mass: linear mass of the cable
+    :param get_parameter_method: method to get the parameters of the catenary (runtime or precompute)
+    :param reference_frame: reference frame of the cable, either 'NED' or 'ENU'
+    """
 
     self.length = length
     self.linear_mass = linear_mass
@@ -59,6 +65,7 @@ class Catenary:
     """
     get all relevant data on the catenary of length self.length, linear mass self.linear_mass, and the given
     attachment points
+
     :param p0: first attachment point
     :param p1: second attachment point
     :return: tuple containing:
@@ -83,6 +90,7 @@ class Catenary:
   def get_lowest_point( self, p0: ndarray, p1: ndarray ) -> ndarray:
     """
     get the catenary's lowest point
+
     :param p0: one end of the catenary
     :param p1: second end of the catenary
     :return: the lowest point (x, y, z) of the catenary
@@ -93,6 +101,7 @@ class Catenary:
   def get_perturbations( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
     get the perturbations of the catenary on the two points
+
     :param p0: one end of the catenary
     :param p1: second end of the catenary
     :return: tuple containing the perturbations force on the two points in the form (perturbation_p1,
@@ -104,6 +113,7 @@ class Catenary:
   def discretize( self, p0: ndarray, p1: ndarray, n: int = 100 ) -> ndarray:
     """
     discretize the catenary, if the optimization fails, the catenary is approximated by a straight line
+
     :param p0: one end of the catenary
     :param p1: second end of the catenary
     :param n: number of point to discretize
@@ -111,10 +121,6 @@ class Catenary:
     """
     C, H, dH, D, dD = self.get_parameters( p0, p1 )
     return self._discretize( p0, p1, C, H, D, dD, n )
-
-  @staticmethod
-  def optimization_function( C, length, dH, two_D_plus_dD ):
-    raise NotImplementedError( 'optimization_function method should have been implemented in __init__' )
 
   def get_parameters( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
@@ -128,6 +134,10 @@ class Catenary:
     - horizontal asymmetric length (ΔD, set to None if out of safe search space and 2D+ΔD > length)
     """
     raise NotImplementedError( 'get_parameters method should have been implemented in __init__' )
+
+  @staticmethod
+  def optimization_function( C, length, dH, two_D_plus_dD ):
+    raise NotImplementedError( 'optimization_function method should have been implemented in __init__' )
 
   def _get_parameters_runtime( self, p0: ndarray, p1: ndarray ) -> tuple:
     """
@@ -159,7 +169,6 @@ class Catenary:
     return C, H, dH, D, dD
 
   def _precompute( self ):
-
     self._dHs = linspace( 0., self.length, 1000 )
     self._two_D_plus_dDs = self.length * logspace( -2, 0, 1000 )
 
@@ -184,9 +193,6 @@ class Catenary:
       dump( self._Cs.tolist(), file )
 
   def _get_parameters_precompute( self, p0: ndarray, p1: ndarray ) -> tuple:
-    """
-    implementation of get_parameters using precomputed values
-    """
     dH = self.vertical_multiplier * (p0[ 2 ] - p1[ 2 ])
     two_D_plus_dD = norm( p1[ :2 ] - p0[ :2 ] )
 
@@ -230,7 +236,6 @@ class Catenary:
       D: float,
       dD: float
       ) -> ndarray:
-
     # case where horizontal distance is too small
     if (C is None) and (H is not None):
       return p0 + array( [ 0, 0, H + dH ] )
