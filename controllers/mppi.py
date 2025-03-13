@@ -1,6 +1,6 @@
 from scipy import __version__
 
-if __version__.split( '.' )[ 1 ] < 15:
+if int( __version__.split( '.' )[ 1 ] ) < 15:
   raise ImportError(
       f"scipy version {__version__} is lower than 1.15.0 which is the minimum required version to use this package"
       )
@@ -32,7 +32,7 @@ class MPPI( MPC ):
       sampling_factor: float = .01,
       constraints: tuple[ NonlinearConstraint | LinearConstraint | Bounds ] = None,
       pose_weight_matrix: ndarray = None,
-      actuation_derivative_weight_matrix: ndarray = None,
+      actuation_weight_matrix: ndarray = None,
       objective_weight: float = 0.,
       final_weight: float = 0.,
       record: bool = False,
@@ -56,7 +56,7 @@ class MPPI( MPC ):
     :param constraints: constraints for the optimization variables
     :param pose_weight_matrix: weight matrix for the pose error; shape: (state_dim//2,
     state_dim//2)
-    :param actuation_derivative_weight_matrix: weight matrix for the actuation derivative; shape:
+    :param actuation_weight_matrix: weight matrix for the actuation derivative; shape:
     (actuation_dim, actuation_dim)
     :param objective_weight: weight for the objective function
     :param final_weight: weight for the final pose error
@@ -108,7 +108,7 @@ class MPPI( MPC ):
     self.pose_weight_matrix: ndarray = zeros(
         (self.horizon, self.model.state.shape[ 0 ] // 2, self.model.state.shape[ 0 ] // 2)
         )
-    self.actuation_derivative_weight_matrix: ndarray = zeros(
+    self.actuation_weight_matrix: ndarray = zeros(
         (self.horizon, self.result_shape[ 2 ], self.result_shape[ 2 ])
         )
 
@@ -117,10 +117,10 @@ class MPPI( MPC ):
     else:
       self.pose_weight_matrix[ : ] = pose_weight_matrix
 
-    if actuation_derivative_weight_matrix is None:
-      self.actuation_derivative_weight_matrix[ : ] = eye( self.result_shape[ 2 ] )
+    if actuation_weight_matrix is None:
+      self.actuation_weight_matrix[ : ] = eye( self.result_shape[ 2 ] )
     else:
-      self.actuation_derivative_weight_matrix[ : ] = actuation_derivative_weight_matrix
+      self.actuation_weight_matrix[ : ] = actuation_weight_matrix
 
     self.objective_weight = objective_weight
     self.final_weight = final_weight
