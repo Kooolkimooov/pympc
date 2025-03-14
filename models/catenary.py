@@ -2,20 +2,7 @@ from json import dump, load
 from pathlib import Path
 
 from numpy import (
-  arccosh,
-  arcsinh,
-  array,
-  cosh,
-  isnan,
-  linspace,
-  log10,
-  logspace,
-  meshgrid,
-  ndarray,
-  set_printoptions,
-  sinh,
-  sqrt,
-  zeros,
+  arccosh, arcsinh, array, cosh, isnan, linspace, log10, logspace, meshgrid, ndarray, sinh, sqrt, zeros,
   )
 from numpy.linalg import norm
 from scipy.optimize import brentq
@@ -227,14 +214,7 @@ class Catenary:
     return C, H, dH, D, dD
 
   def _get_lowest_point(
-      self,
-      p0: ndarray,
-      p1: ndarray,
-      C: float,
-      H: float,
-      dH: float,
-      D: float,
-      dD: float
+      self, p0: ndarray, p1: ndarray, C: float, H: float, dH: float, D: float, dD: float
       ) -> ndarray:
     # case where horizontal distance is too small
     if (C is None) and (H is not None):
@@ -312,4 +292,3 @@ class Catenary:
   @staticmethod
   def _optimization_function_1( C, length, dH, two_D_plus_dD ) -> float:
     return pow( length, 2 ) - pow( dH, 2 ) - pow( 2 * sinh( C * two_D_plus_dD / 2 ) / C, 2 )
-
