@@ -7,8 +7,14 @@ class Turtlebot( Dynamics ):
   """
   implementation of the dynamics of the Turtlebot model
   """
+
+  
+
+
+
   _state_size = 6
   _actuation_size = 2
+  _perturbation_size = 0
 
   _position = slice( 0, 2 )
   _orientation = 2

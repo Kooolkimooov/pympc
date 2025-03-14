@@ -55,31 +55,31 @@ class Dynamics:
     return self._perturbation_size
 
   @property
-  def position( self ) -> int | slice | ndarray:
+  def position( self ) -> any:
     """indices of the position inside the state vector"""
     return self._position
 
   @property
-  def orientation( self ) -> int | slice | ndarray:
+  def orientation( self )  -> any:
     """indices of the orientation inside the state vector"""
     return self._orientation
 
   @property
-  def velocity( self ) -> int | slice | ndarray:
+  def velocity( self )  -> any:
     """indices of the velocity inside the state vector"""
     return self._velocity
 
   @property
-  def body_rates( self ) -> int | slice | ndarray:
+  def body_rates( self )  -> any:
     """indices of the body rates inside the state vector"""
     return self._body_rates
 
   @property
-  def linear_actuation( self ) -> int | slice | ndarray:
+  def linear_actuation( self )  -> any:
     """indices of the linear actuation inside the actuation vector"""
     return self._linear_actuation
 
   @property
-  def angular_actuation( self ) -> int | slice | ndarray:
+  def angular_actuation( self )  -> any:
     """indices of the angular actuation inside the actuation vector"""
     return self._angular_actuation
