@@ -64,6 +64,11 @@ class AugmentedCatenary( Catenary ):
     """
     get the catenary's lowest point
 
+    this method is currently unreliable with some augmented catenary configurations
+    because it the lowest point is computed for the catenary with the virtual point
+    before it is rotated back into the original frame.
+    TODO: fix that
+
     :param p0: one end of the catenary
     :param p1: second end of the catenary
     :param gamma: tilt angle of the catenary plane around the p0-p1 axis
