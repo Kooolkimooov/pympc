@@ -1,7 +1,6 @@
 from time import perf_counter
 
 from numpy import ndarray, zeros
-
 from pympc.models.model import Model
 
 

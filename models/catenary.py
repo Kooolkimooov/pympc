@@ -5,10 +5,9 @@ from numpy import (
   arccosh, arcsinh, array, cosh, isnan, linspace, log10, logspace, meshgrid, ndarray, sinh, sqrt, zeros,
   )
 from numpy.linalg import norm
+from pympc.utils import check, G
 from scipy.optimize import brentq
 from tqdm import tqdm
-
-from pympc.utils import check, G
 
 
 class Catenary:

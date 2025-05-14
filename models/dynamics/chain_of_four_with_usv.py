@@ -1,6 +1,5 @@
 from numpy import dot, ndarray, r_, zeros
 from numpy.linalg import norm
-
 from pympc.controllers.mpc import MPC
 from pympc.models.catenary import Catenary
 from pympc.models.dynamics.bluerov import BluerovXYZPsi as Bluerov, USV

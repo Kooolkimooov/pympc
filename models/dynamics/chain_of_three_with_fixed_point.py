@@ -2,7 +2,6 @@ from warnings import simplefilter
 
 from numpy import dot, ndarray, r_, zeros
 from numpy.linalg import norm
-
 from pympc.models.catenary import Catenary
 from pympc.models.dynamics.bluerov import BluerovXYZPsi as Bluerov
 from pympc.models.seafloor import Seafloor
