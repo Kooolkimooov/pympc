@@ -54,9 +54,9 @@ class BluerovROSInterface( Interface ):
   @staticmethod
   def pose_from_ros_pose( ros_pose: Pose ) -> ndarray:
     pose = zeros( (Bluerov._state_size // 2,) )
-    pose[ Bluerov.position ][ 0 ] = ros_pose.position.x
-    pose[ Bluerov.position ][ 1 ] = ros_pose.position.y
-    pose[ Bluerov.position ][ 2 ] = ros_pose.position.z
+    pose[ Bluerov._position ][ 0 ] = ros_pose.position.x
+    pose[ Bluerov._position ][ 1 ] = ros_pose.position.y
+    pose[ Bluerov._position ][ 2 ] = ros_pose.position.z
     pose[ 3:6 ] = Rotation.from_quat(
         [ ros_pose.orientation.x, ros_pose.orientation.y, ros_pose.orientation.z, ros_pose.orientation.w ]
         ).as_euler( 'xyz' )
