@@ -227,7 +227,7 @@ def compare_dict( d0: dict, d1: dict, max_list_size: int = 10, prefix: str = '',
     if v1 is None:
       v1 = v0.__class__()
 
-    color_prefix = '\033[1;42m' if equal else '\033[1;41m'
+    color_prefix = '\033[1;102m' if equal else '\033[1;101m'
     color_suffix = '\033[0m'
 
     if type( v0 ) != type( v1 ):
