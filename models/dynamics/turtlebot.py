@@ -53,19 +53,10 @@ if __name__ == '__main__':
     print( f"{tb.angular_actuation=}" )
 
     s = random( (tb.state_size,) )
-
-    print( f"{s=}" )
-
     a = random( (tb.actuation_size,) )
-    print( f"{a=}" )
-
     p = random( (tb.state_size // 2,) )
-    print( f"{p=}" )
-
     ds = tb( s, a, p )
-    print( f"{ds=}" )
 
     t = random( (10, 1, tb.state_size // 2) )
     a = random( (10, 1, tb.state_size // 2) )
     e = tb.compute_error( a, t )
-    print( f"{e=}" )

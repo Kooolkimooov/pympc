@@ -312,27 +312,9 @@ if __name__ == '__main__':
         print( f"{br.six_dof_actuation_mask=}" )
 
         s = random( (br.state_size,) )
-
-        print( f"{s=}" )
-        print( f"{s[ br.position ]=}" )
-        print( f"{s[ br.orientation ]=}" )
-        print( f"{s[ br.velocity ]=}" )
-        print( f"{s[ br.body_rates ]=}" )
-
         a = random( (br.actuation_size,) )
-        print( f"{a=}" )
-        print( f"{a[ br.linear_actuation ]=}" )
-        print( f"{a[ br.angular_actuation ]=}" )
-
         p = random( (br.state_size // 2,) )
-        print( f"{p=}" )
-
         ds = br( s, a, p )
-        print( f"{ds=}" )
-        print( f"{ds[ br.position ]=}" )
-        print( f"{ds[ br.orientation ]=}" )
-        print( f"{ds[ br.velocity ]=}" )
-        print( f"{ds[ br.body_rates ]=}" )
 
         t = random( (10, 1, br.state_size // 2) )
         a = random( (10, 1, br.state_size // 2) )
