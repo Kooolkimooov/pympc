@@ -36,7 +36,7 @@ class Model:
     self.state = initial_state.copy() if not initial_state is None else zeros( (dynamics.state_size,) )
     self.actuation = initial_actuation.copy() if not initial_actuation is None else zeros( (dynamics.actuation_size,) )
     self.perturbation = initial_perturbation.copy() if not initial_perturbation is None else zeros(
-        (dynamics.perturbation_size,)
+        (dynamics.state_size // 2,)
         )
 
     self.record = record
