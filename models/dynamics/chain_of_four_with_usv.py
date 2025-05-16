@@ -1,368 +1,587 @@
 from numpy import dot, ndarray, r_, zeros
 from numpy.linalg import norm
+
 from pympc.controllers.mpc import MPC
 from pympc.models.catenary import Catenary
 from pympc.models.dynamics.bluerov import BluerovXYZPsi as Bluerov, USV
+from pympc.models.dynamics.dynamics import Dynamics
 from pympc.models.seafloor import Seafloor
 
 
-class ChainOf4WithUSV:
+class ChainOf4WithUSV( Dynamics ):
+    _state_size = Bluerov().state_size * 4
+    _actuation_size = Bluerov().actuation_size * 4
 
-  state_size = 4 * Bluerov.state_size
-  actuation_size = 3 * Bluerov.actuation_size + USV.actuation_size
+    _position = r_[ slice( 0, 3 ), slice( 6, 9 ), slice( 12, 15 ), slice( 18, 21 ) ]
+    _orientation = r_[ slice( 3, 6 ), slice( 9, 12 ), slice( 15, 18 ), slice( 21, 24 ) ]
+    _velocity = r_[ slice( 24, 27 ), slice( 30, 33 ), slice( 36, 39 ), slice( 42, 45 ) ]
+    _body_rates = r_[ slice( 27, 30 ), slice( 33, 36 ), slice( 39, 42 ), slice( 45, 48 ) ]
 
-  def __init__(
-      self,
-      water_surface_depth: float,
-      water_current: ndarray,
-      seafloor: Seafloor,
-      cables_length: float,
-      cables_linear_mass: float,
-      get_cable_parameter_method
-      ):
+    _linear_actuation = r_[
+        Bluerov().linear_actuation, Bluerov().linear_actuation + Bluerov().linear_actuation.shape[ 0 ] +
+                                    Bluerov().angular_actuation.shape[ 0 ] ]
+    _angular_actuation = r_[
+        Bluerov().angular_actuation, Bluerov().angular_actuation + Bluerov().linear_actuation.shape[ 0 ] +
+                                     Bluerov().angular_actuation.shape[ 0 ] ]
 
-    self.br_0 = Bluerov( water_surface_depth, water_current )
-    self.c_01 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method )
-    self.br_1 = Bluerov( water_surface_depth, water_current )
-    self.c_12 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method )
-    self.br_2 = Bluerov( water_surface_depth, water_current )
-    self.c_23 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method )
-    self.br_3 = USV( water_surface_depth )
+    _br_state_size = Bluerov().state_size
+    _br_actuation_size = Bluerov().actuation_size
 
-    self.sf = seafloor
+    _br_0_position = _position[ :3 ]
+    _br_0_orientation = _orientation[ :3 ]
+    _br_0_velocity = _velocity[ :3 ]
+    _br_0_body_rates = _body_rates[ :3 ]
 
-    self.last_perturbation_01_0 = zeros( (Bluerov.pose_size,) )
-    self.last_perturbation_01_1 = zeros( (Bluerov.pose_size,) )
-    self.last_perturbation_12_1 = zeros( (Bluerov.pose_size,) )
-    self.last_perturbation_12_2 = zeros( (Bluerov.pose_size,) )
-    self.last_perturbation_23_2 = zeros( (Bluerov.pose_size,) )
-    self.last_perturbation_23_3 = zeros( (Bluerov.pose_size,) )
+    _br_0_pose = r_[ _br_0_position, _br_0_orientation ]
+    _br_0_state = r_[ _br_0_position, _br_0_orientation, _br_0_velocity, _br_0_body_rates ]
 
-    self.br_0_pose = slice( 0, 6 )
-    self.br_0_position = slice( 0, 3 )
-    self.br_0_xy = slice( 0, 2 )
-    self.br_0_z = 2
-    self.br_0_orientation = slice( 3, 6 )
+    _br_0_linear_actuation = Bluerov().linear_actuation
+    _br_0_angular_actuation = Bluerov().angular_actuation
+    _br_0_actuation = r_[ _br_0_linear_actuation, _br_0_angular_actuation ]
 
-    self.br_1_pose = slice( 6, 12 )
-    self.br_1_position = slice( 6, 9 )
-    self.br_1_xy = slice( 6, 8 )
-    self.br_1_z = 8
-    self.br_1_orientation = slice( 9, 12 )
+    _br_0_perturbation = r_[ slice( 0 * _state_size // (2 * 4), 1 * _state_size // (2 * 4) ) ]
 
-    self.br_2_pose = slice( 12, 18 )
-    self.br_2_position = slice( 12, 15 )
-    self.br_2_xy = slice( 12, 14 )
-    self.br_2_z = 14
-    self.br_2_orientation = slice( 15, 18 )
+    _br_1_position = _position[ 3:6 ]
+    _br_1_orientation = _orientation[ 3:6 ]
+    _br_1_velocity = _velocity[ 3:6 ]
+    _br_1_body_rates = _body_rates[ 3:6 ]
 
-    self.br_3_pose = slice( 18, 24 )
-    self.br_3_position = slice( 18, 21 )
-    self.br_3_xy = slice( 18, 20 )
-    self.br_3_z = 20
-    self.br_3_orientation = slice( 21, 24 )
+    _br_1_pose = r_[ _br_1_position, _br_1_orientation ]
+    _br_1_state = r_[ _br_1_position, _br_1_orientation, _br_1_velocity, _br_1_body_rates ]
 
-    self.br_0_speed = slice( 24, 30 )
-    self.br_0_linear_speed = slice( 24, 27 )
-    self.br_0_angular_speed = slice( 27, 30 )
+    _br_1_linear_actuation = Bluerov().linear_actuation + Bluerov().actuation_size
+    _br_1_angular_actuation = Bluerov().angular_actuation + Bluerov().actuation_size
+    _br_1_actuation = r_[ _br_1_linear_actuation, _br_1_angular_actuation ]
 
-    self.br_1_speed = slice( 30, 36 )
-    self.br_1_linear_speed = slice( 30, 33 )
-    self.br_1_angular_speed = slice( 33, 36 )
+    _br_1_perturbation = r_[ slice( 1 * _state_size // (2 * 4), 2 * _state_size // (2 * 4) ) ]
 
-    self.br_2_speed = slice( 36, 42 )
-    self.br_2_linear_speed = slice( 36, 39 )
-    self.br_2_angular_speed = slice( 39, 42 )
+    _br_2_position = _position[ 6:9 ]
+    _br_2_orientation = _orientation[ 6:9 ]
+    _br_2_velocity = _velocity[ 6:9 ]
+    _br_2_body_rates = _body_rates[ 6:9 ]
 
-    self.br_3_speed = slice( 42, 48 )
-    self.br_3_linear_speed = slice( 42, 45 )
-    self.br_3_angular_speed = slice( 45, 48 )
+    _br_2_pose = r_[ _br_2_position, _br_2_orientation ]
+    _br_2_state = r_[ _br_2_position, _br_2_orientation, _br_2_velocity, _br_2_body_rates ]
 
-    self.br_0_actuation_start = 0
-    self.br_0_actuation = slice( self.br_0_actuation_start, self.br_0_actuation_start + Bluerov.actuation_size )
-    self.br_0_linear_actuation = slice(
-        self.br_0_actuation_start, self.br_0_actuation_start + Bluerov.linear_actuation_size
+    _br_2_linear_actuation = Bluerov().linear_actuation + Bluerov().actuation_size * 2
+    _br_2_angular_actuation = Bluerov().angular_actuation + Bluerov().actuation_size * 2
+    _br_2_actuation = r_[ _br_2_linear_actuation, _br_2_angular_actuation ]
+
+    _br_2_perturbation = r_[ slice( 2 * _state_size // (2 * 4), 3 * _state_size // (2 * 4) ) ]
+
+    _br_3_position = _position[ 9:12 ]
+    _br_3_orientation = _orientation[ 9:12 ]
+    _br_3_velocity = _velocity[ 9:12 ]
+    _br_3_body_rates = _body_rates[ 9:12 ]
+
+    _br_3_pose = r_[ _br_3_position, _br_3_orientation ]
+    _br_3_state = r_[ _br_3_position, _br_3_orientation, _br_3_velocity, _br_3_body_rates ]
+
+    _br_3_linear_actuation = Bluerov().linear_actuation + Bluerov().actuation_size * 3
+    _br_3_angular_actuation = Bluerov().angular_actuation + Bluerov().actuation_size * 3
+    _br_3_actuation = r_[ _br_3_linear_actuation, _br_3_angular_actuation ]
+
+    _br_3_perturbation = r_[ slice( 3 * _state_size // (2 * 4), 4 * _state_size // (2 * 4) ) ]
+
+    def __init__(
+            self,
+            water_surface_depth: float,
+            water_current: ndarray,
+            seafloor: Seafloor,
+            cables_length: float,
+            cables_linear_mass: float,
+            get_cable_parameter_method,
+            reference_frame
+    ):
+        self.br_0 = Bluerov( water_surface_depth, water_current, reference_frame )
+        self.c_01 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method, reference_frame )
+        self.br_1 = Bluerov( water_surface_depth, water_current, reference_frame )
+        self.c_12 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method, reference_frame )
+        self.br_2 = Bluerov( water_surface_depth, water_current, reference_frame )
+        self.c_23 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method, reference_frame )
+        self.br_3 = USV( water_surface_depth, reference_frame )
+
+        self.sf = seafloor
+
+    def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
+        """
+        evaluates the dynamics of each robot of the chain
+        :param state: current state of the system
+        :param actuation: current actuation of the system
+        :return: state derivative of the system
+        """
+        state_derivative = zeros( state.shape )
+
+        perturbation_01_0, perturbation_01_1 = self.c_01.get_perturbations(
+                state[ self.br_0_position ], state[ self.br_1_position ]
         )
-    self.br_0_angular_actuation = slice(
-        self.br_0_actuation_start + Bluerov.linear_actuation_size, self.br_0_actuation_start + Bluerov.actuation_size
+        perturbation_12_1, perturbation_12_2 = self.c_12.get_perturbations(
+                state[ self.br_1_position ], state[ self.br_2_position ]
         )
-
-    self.br_1_actuation_start = Bluerov.actuation_size
-    self.br_1_actuation = slice( self.br_1_actuation_start, self.br_1_actuation_start + Bluerov.actuation_size )
-    self.br_1_linear_actuation = slice(
-        self.br_1_actuation_start, self.br_1_actuation_start + Bluerov.linear_actuation_size
-        )
-    self.br_1_angular_actuation = slice(
-        self.br_1_actuation_start + Bluerov.linear_actuation_size, self.br_1_actuation_start + Bluerov.actuation_size
-        )
-
-    self.br_2_actuation_start = 2 * Bluerov.actuation_size
-    self.br_2_actuation = slice( self.br_2_actuation_start, self.br_2_actuation_start + Bluerov.actuation_size )
-    self.br_2_linear_actuation = slice(
-        self.br_2_actuation_start, self.br_2_actuation_start + Bluerov.linear_actuation_size
-        )
-    self.br_2_angular_actuation = slice(
-        self.br_2_actuation_start + Bluerov.linear_actuation_size, self.br_2_actuation_start + Bluerov.actuation_size
-        )
-
-    self.br_3_actuation_start = 3 * Bluerov.actuation_size
-    self.br_3_actuation = slice( self.br_3_actuation_start, self.br_3_actuation_start + USV.actuation_size )
-    self.br_3_linear_actuation = slice(
-        self.br_3_actuation_start, self.br_3_actuation_start + USV.linear_actuation_size
-        )
-    self.br_3_angular_actuation = slice(
-        self.br_3_actuation_start + USV.linear_actuation_size, self.br_3_actuation_start + USV.actuation_size
-        )
-
-    self.br_0_state = r_[ self.br_0_pose, self.br_0_speed ]
-    self.br_1_state = r_[ self.br_1_pose, self.br_1_speed ]
-    self.br_2_state = r_[ self.br_2_pose, self.br_2_speed ]
-    self.br_3_state = r_[ self.br_3_pose, self.br_3_speed ]
-
-  def __call__( self, state: ndarray, actuation: ndarray ) -> ndarray:
-    """
-    evaluates the dynamics of each robot of the chain
-    :param state: current state of the system
-    :param actuation: current actuation of the system
-    :return: state derivative of the system
-    """
-    state_derivative = zeros( state.shape )
-
-    perturbation_01_0, perturbation_01_1 = self.c_01.get_perturbations(
-        state[ self.br_0_position ], state[ self.br_1_position ]
-        )
-    perturbation_12_1, perturbation_12_2 = self.c_12.get_perturbations(
-        state[ self.br_1_position ], state[ self.br_2_position ]
-        )
-    perturbation_23_2, perturbation_23_3 = self.c_23.get_perturbations(
-        state[ self.br_2_position ], state[ self.br_3_position ]
+        perturbation_23_2, perturbation_23_3 = self.c_23.get_perturbations(
+                state[ self.br_2_position ], state[ self.br_3_position ]
         )
 
-    # if the cable is taunt the perturbation is None
-    # here we should consider any pair with a taunt cable as a single body
-    if perturbation_01_0 is not None:
-      self.last_perturbation_01_0[ :3 ] = perturbation_01_0
-      self.last_perturbation_01_1[ :3 ] = perturbation_01_1
-    else:
-      perturbation_01_0, perturbation_01_1 = self.get_taunt_cable_perturbations( state, actuation, 0 )
+        # if the cable is taunt the perturbation is None
+        # here we should consider any pair with a taunt cable as a single body
+        if perturbation_01_0 is None:
+            perturbation_01_0, perturbation_01_1 = self.get_taunt_cable_perturbations(
+                    self.br_0,
+                    self.br_1,
+                    state[ self.br_0_state ],
+                    state[ self.br_1_state ],
+                    actuation[ self.br_0_actuation ],
+                    actuation[ self.br_1_actuation ]
+            )
 
-    if perturbation_12_1 is not None:
-      self.last_perturbation_12_1[ :3 ] = perturbation_12_1
-      self.last_perturbation_12_2[ :3 ] = perturbation_12_2
-    else:
-      perturbation_12_1, perturbation_12_2 = self.get_taunt_cable_perturbations( state, actuation, 1 )
+        if perturbation_12_1 is None:
+            perturbation_12_1, perturbation_12_2 = self.get_taunt_cable_perturbations(
+                    self.br_1,
+                    self.br_2,
+                    state[ self.br_1_state ],
+                    state[ self.br_2_state ],
+                    actuation[ self.br_1_actuation ],
+                    actuation[ self.br_2_actuation ]
+            )
 
-    if perturbation_23_2 is not None:
-      self.last_perturbation_23_2[ :3 ] = perturbation_23_2
-      self.last_perturbation_23_3[ :3 ] = perturbation_23_3
-    else:
-      perturbation_23_2, perturbation_23_3 = self.get_taunt_cable_perturbations( state, actuation, 2 )
+        if perturbation_23_2 is None:
+            perturbation_23_2, perturbation_23_3 = self.get_taunt_cable_perturbations(
+                    self.br_2,
+                    self.br_3,
+                    state[ self.br_2_state ],
+                    state[ self.br_3_state ],
+                    actuation[ self.br_2_actuation ],
+                    actuation[ self.br_3_actuation ]
+            )
 
-    perturbation_01_0.resize( (Bluerov.pose_size,), refcheck = False )
-    perturbation_01_1.resize( (Bluerov.pose_size,), refcheck = False )
-    perturbation_12_1.resize( (Bluerov.pose_size,), refcheck = False )
-    perturbation_12_2.resize( (Bluerov.pose_size,), refcheck = False )
-    perturbation_23_2.resize( (Bluerov.pose_size,), refcheck = False )
-    perturbation_23_3.resize( (Bluerov.pose_size,), refcheck = False )
+        perturbation_01_0.resize( (self.br_state_size // 2,), refcheck=False )
+        perturbation_01_1.resize( (self.br_state_size // 2,), refcheck=False )
+        perturbation_12_1.resize( (self.br_state_size // 2,), refcheck=False )
+        perturbation_12_2.resize( (self.br_state_size // 2,), refcheck=False )
+        perturbation_23_2.resize( (self.br_state_size // 2,), refcheck=False )
+        perturbation_23_3.resize( (self.br_state_size // 2,), refcheck=False )
 
-    # perturbation is in world frame, should be applied robot frame instead
-    br_0_transformation_matrix = self.br_0.build_transformation_matrix( *state[ self.br_0_orientation ] )
-    br_1_transformation_matrix = self.br_1.build_transformation_matrix( *state[ self.br_1_orientation ] )
-    br_2_transformation_matrix = self.br_2.build_transformation_matrix( *state[ self.br_2_orientation ] )
-    br_3_transformation_matrix = self.br_3.build_transformation_matrix( *state[ self.br_3_orientation ] )
+        # perturbation is in world frame, should be applied robot frame instead
+        br_0_transformation_matrix = self.br_0.build_transformation_matrix( *state[ self.br_0_orientation ] )
+        br_1_transformation_matrix = self.br_1.build_transformation_matrix( *state[ self.br_1_orientation ] )
+        br_2_transformation_matrix = self.br_2.build_transformation_matrix( *state[ self.br_2_orientation ] )
+        br_3_transformation_matrix = self.br_3.build_transformation_matrix( *state[ self.br_3_orientation ] )
 
-    perturbation_01_0 = br_0_transformation_matrix.T @ perturbation_01_0
-    perturbation_01_1 = br_1_transformation_matrix.T @ perturbation_01_1
-    perturbation_12_1 = br_1_transformation_matrix.T @ perturbation_12_1
-    perturbation_12_2 = br_2_transformation_matrix.T @ perturbation_12_2
-    perturbation_23_2 = br_2_transformation_matrix.T @ perturbation_23_2
-    perturbation_23_3 = br_3_transformation_matrix.T @ perturbation_23_3
+        perturbation_01_0 = br_0_transformation_matrix.T @ perturbation_01_0
+        perturbation_01_1 = br_1_transformation_matrix.T @ perturbation_01_1
+        perturbation_12_1 = br_1_transformation_matrix.T @ perturbation_12_1
+        perturbation_12_2 = br_2_transformation_matrix.T @ perturbation_12_2
+        perturbation_23_2 = br_2_transformation_matrix.T @ perturbation_23_2
+        perturbation_23_3 = br_3_transformation_matrix.T @ perturbation_23_3
 
-    state_derivative[ self.br_0_state ] = self.br_0(
-        state[ self.br_0_state ], actuation[ self.br_0_actuation ], perturbation_01_0
+        state_derivative[ self.br_0_state ] = self.br_0(
+                state[ self.br_0_state ],
+                actuation[ self.br_0_actuation ],
+                perturbation[ self.br_0_perturbation ] + perturbation_01_0
         )
-    state_derivative[ self.br_1_state ] = self.br_1(
-        state[ self.br_1_state ], actuation[ self.br_1_actuation ], perturbation_01_1 + perturbation_12_1
+        state_derivative[ self.br_1_state ] = self.br_1(
+                state[ self.br_1_state ],
+                actuation[ self.br_1_actuation ],
+                perturbation[ self.br_1_perturbation ] + perturbation_01_1 + perturbation_12_1
         )
-    state_derivative[ self.br_2_state ] = self.br_2(
-        state[ self.br_2_state ], actuation[ self.br_2_actuation ], perturbation_12_2 + perturbation_23_2
+        state_derivative[ self.br_2_state ] = self.br_2(
+                state[ self.br_2_state ],
+                actuation[ self.br_2_actuation ],
+                perturbation[ self.br_2_perturbation ] + perturbation_12_2 + perturbation_23_2
         )
-    state_derivative[ self.br_3_state ] = self.br_3(
-        state[ self.br_3_state ], actuation[ self.br_3_actuation ], perturbation_23_3
+        state_derivative[ self.br_3_state ] = self.br_3(
+                state[ self.br_3_state ],
+                actuation[ self.br_3_actuation ],
+                perturbation[ self.br_3_perturbation ] + perturbation_23_3
         )
 
-    return state_derivative
+        return state_derivative
 
-  def get_taunt_cable_perturbations(
-      self, state: ndarray, actuation: ndarray, pair: int
-      ) -> tuple:
-    if pair == 0:
-      br_0 = self.br_0
-      br_1 = self.br_1
-      br_0_state = self.br_0_state
-      br_0_position = self.br_0_position
-      br_0_orientation = self.br_0_orientation
-      br_0_actuation = self.br_0_actuation
-      br_0_perturbation = self.last_perturbation_01_0
-      br_1_state = self.br_1_state
-      br_1_position = self.br_1_position
-      br_1_orientation = self.br_1_orientation
-      br_1_actuation = self.br_1_actuation
-      br_1_perturbation = self.last_perturbation_01_1
-    elif pair == 1:
-      br_0 = self.br_1
-      br_1 = self.br_2
-      br_0_state = self.br_1_state
-      br_0_position = self.br_1_position
-      br_0_orientation = self.br_1_orientation
-      br_0_actuation = self.br_1_actuation
-      br_0_perturbation = self.last_perturbation_12_1
-      br_1_state = self.br_2_state
-      br_1_position = self.br_2_position
-      br_1_orientation = self.br_2_orientation
-      br_1_actuation = self.br_2_actuation
-      br_1_perturbation = self.last_perturbation_12_2
-    elif pair == 2:
-      br_0 = self.br_2
-      br_1 = self.br_3
-      br_0_state = self.br_2_state
-      br_0_position = self.br_2_position
-      br_0_orientation = self.br_2_orientation
-      br_0_actuation = self.br_2_actuation
-      br_0_perturbation = self.last_perturbation_23_2
-      br_1_state = self.br_3_state
-      br_1_position = self.br_3_position
-      br_1_orientation = self.br_3_orientation
-      br_1_actuation = self.br_3_actuation
-      br_1_perturbation = self.last_perturbation_23_3
-    else:
-      raise RuntimeError( f'unknown pair: {pair}' )
+    def compute_error( self, actual: ndarray, target: ndarray ) -> ndarray:
+        error = zeros( actual.shape )
+        error[ :, :, self.br_0_pose ] = self.br_0.compute_error(
+                actual[ :, :, self.br_0_pose ], target[ :, :, self.br_0_pose ]
+        )
+        error[ :, :, self.br_1_pose ] = self.br_1.compute_error(
+                actual[ :, :, self.br_1_pose ], target[ :, :, self.br_1_pose ]
+        )
+        error[ :, :, self.br_2_pose ] = self.br_2.compute_error(
+                actual[ :, :, self.br_2_pose ], target[ :, :, self.br_2_pose ]
+        )
+        error[ :, :, self.br_3_pose ] = self.br_3.compute_error(
+                actual[ :, :, self.br_3_pose ], target[ :, :, self.br_3_pose ]
+        )
+        return error
 
-    # from br_0 to br_1
-    direction = state[ br_1_position ] - state[ br_0_position ]
-    direction /= norm( direction )
+    def get_taunt_cable_perturbations(
+            self,
+            br_0: Bluerov,
+            br_1: Bluerov,
+            br_0_state: ndarray,
+            br_1_state: ndarray,
+            br_0_actuation: ndarray,
+            br_1_actuation: ndarray
+    ) -> tuple:
+        # from br_0 to br_1
+        direction = br_1_state[ br_1.position ] - br_0_state[ br_0.position ]
+        direction /= norm( direction )
 
-    null = zeros( (br_0.pose_size,) )
+        null = zeros( (self.br_state_size // 2,) )
 
-    br_0_transformation_matrix = br_0.build_transformation_matrix( *state[ br_0_orientation ] )
-    br_1_transformation_matrix = br_1.build_transformation_matrix( *state[ br_1_orientation ] )
+        br_0_transformation_matrix = br_0.build_transformation_matrix( *br_0_state[ br_0.orientation ] )
+        br_1_transformation_matrix = br_1.build_transformation_matrix( *br_1_state[ br_1.orientation ] )
 
-    # in robot frame
-    br_0_acceleration = br_0( state[ br_0_state ], actuation[ br_0_actuation ], null )[ 6: ]
-    br_0_forces = (br_0.inertial_matrix[ :3, :3 ] @ br_0_acceleration[ :3 ])
+        # in robot frame
+        br_0_acceleration = br_0( br_0_state, br_0_actuation, null )[ 6: ]
+        br_0_forces = br_0.inertial_matrix[ :3, :3 ] @ br_0_acceleration[ :3 ]
 
-    br_1_acceleration = br_1( state[ br_1_state ], actuation[ br_1_actuation ], null )[ 6: ]
-    br_1_forces = (br_1.inertial_matrix[ :3, :3 ] @ br_1_acceleration[ :3 ])
+        br_1_acceleration = br_1( br_1_state, br_1_actuation, null )[ 6: ]
+        br_1_forces = br_1.inertial_matrix[ :3, :3 ] @ br_1_acceleration[ :3 ]
 
-    all_forces = dot( br_0_transformation_matrix[ :3, :3 ] @ br_0_forces, -direction )
-    all_forces += dot( br_1_transformation_matrix[ :3, :3 ] @ br_1_forces, direction )
-    all_forces += dot( br_0_perturbation[ :3 ], direction )
-    all_forces += dot( br_1_perturbation[ :3 ], -direction )
+        all_forces = dot( br_0_transformation_matrix[ :3, :3 ] @ br_0_forces, -direction )
+        all_forces += dot( br_1_transformation_matrix[ :3, :3 ] @ br_1_forces, direction )
 
-    perturbation = direction * all_forces
+        perturbation = direction * all_forces
 
-    # in world frame
-    return perturbation, -perturbation
+        # in world frame
+        return perturbation, -perturbation
+
+    @property
+    def br_state_size( self ):
+        return self._br_state_size
+
+    @property
+    def br_actuation_size( self ):
+        return self._br_actuation_size
+
+    @property
+    def br_0_position( self ):
+        return self._br_0_position
+
+    @property
+    def br_0_orientation( self ):
+        return self._br_0_orientation
+
+    @property
+    def br_0_velocity( self ):
+        return self._br_0_velocity
+
+    @property
+    def br_0_body_rates( self ):
+        return self._br_0_body_rates
+
+    @property
+    def br_0_pose( self ):
+        return self._br_0_pose
+
+    @property
+    def br_0_state( self ):
+        return self._br_0_state
+
+    @property
+    def br_0_actuation( self ):
+        return self._br_0_actuation
+
+    @property
+    def br_0_perturbation( self ):
+        return self._br_0_perturbation
+
+    @property
+    def br_0_linear_actuation( self ):
+        return self._br_0_linear_actuation
+
+    @property
+    def br_0_angular_actuation( self ):
+        return self._br_0_angular_actuation
+
+    @property
+    def br_1_position( self ):
+        return self._br_1_position
+
+    @property
+    def br_1_orientation( self ):
+        return self._br_1_orientation
+
+    @property
+    def br_1_velocity( self ):
+        return self._br_1_velocity
+
+    @property
+    def br_1_body_rates( self ):
+        return self._br_1_body_rates
+
+    @property
+    def br_1_pose( self ):
+        return self._br_1_pose
+
+    @property
+    def br_1_state( self ):
+        return self._br_1_state
+
+    @property
+    def br_1_actuation( self ):
+        return self._br_1_actuation
+
+    @property
+    def br_1_perturbation( self ):
+        return self._br_1_perturbation
+
+    @property
+    def br_1_linear_actuation( self ):
+        return self._br_1_linear_actuation
+
+    @property
+    def br_1_angular_actuation( self ):
+        return self._br_1_angular_actuation
+
+    @property
+    def br_2_position( self ):
+        return self._br_2_position
+
+    @property
+    def br_2_orientation( self ):
+        return self._br_2_orientation
+
+    @property
+    def br_2_velocity( self ):
+        return self._br_2_velocity
+
+    @property
+    def br_2_body_rates( self ):
+        return self._br_2_body_rates
+
+    @property
+    def br_2_pose( self ):
+        return self._br_2_pose
+
+    @property
+    def br_2_state( self ):
+        return self._br_2_state
+
+    @property
+    def br_2_linear_actuation( self ):
+        return self._br_2_linear_actuation
+
+    @property
+    def br_2_angular_actuation( self ):
+        return self._br_2_angular_actuation
+
+    @property
+    def br_2_actuation( self ):
+        return self._br_2_actuation
+
+    @property
+    def br_2_perturbation( self ):
+        return self._br_2_perturbation
+
+    @property
+    def br_3_position( self ):
+        return self._br_3_position
+
+    @property
+    def br_3_orientation( self ):
+        return self._br_3_orientation
+
+    @property
+    def br_3_velocity( self ):
+        return self._br_3_velocity
+
+    @property
+    def br_3_body_rates( self ):
+        return self._br_3_body_rates
+
+    @property
+    def br_3_pose( self ):
+        return self._br_3_pose
+
+    @property
+    def br_3_state( self ):
+        return self._br_3_state
+
+    @property
+    def br_3_linear_actuation( self ):
+        return self._br_3_linear_actuation
+
+    @property
+    def br_3_angular_actuation( self ):
+        return self._br_3_angular_actuation
+
+    @property
+    def br_3_actuation( self ):
+        return self._br_3_actuation
+
+    @property
+    def br_3_perturbation( self ):
+        return self._br_3_perturbation
 
 
-def chain_of_4_constraints( self: MPC, candidate ):
+def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
+    chain: ChainOf4WithUSV = self.model.dynamics
 
-  chain: ChainOf4WithUSV = self.model.dynamics
+    actuation, _ = self.get_actuation( candidate )
 
-  actuation, _ = self.get_actuation( candidate )
+    prediction = self.predict( actuation )
+    prediction = prediction[ :, 0 ]
 
-  prediction = self.predict( actuation )
-  prediction = prediction[ :, 0 ]
+    # 3 constraints on cables (distance of lowest point to seafloor)
+    # 4 constraints on robots (distance of lowest point to seafloor)
+    # 6 on inter robot_distance (3 horizontal, 2 3d)
+    n_constraints = 3 + 4 + 6
+    constraints = zeros( (self.horizon, n_constraints) )
 
-  # 3 constraints on cables (distance of lowest point to seafloor)
-  # 4 constraints on robots (distance of lowest point to seafloor)
-  # 6 on inter robot_distance (3 horizontal, 2 3d)
-  n_constraints = 3 + 4 + 6
-  constraints = zeros( (self.horizon, n_constraints) )
+    for i, state in enumerate( prediction ):
+        lp01 = chain.c_01.get_lowest_point( state[ chain.br_0_position ], state[ chain.br_1_position ] )
+        lp12 = chain.c_12.get_lowest_point( state[ chain.br_1_position ], state[ chain.br_2_position ] )
+        lp23 = chain.c_23.get_lowest_point( state[ chain.br_2_position ], state[ chain.br_3_position ] )
 
-  for i, state in enumerate( prediction ):
-    lp01 = chain.c_01.get_lowest_point( state[ chain.br_0_position ], state[ chain.br_1_position ] )
-    lp12 = chain.c_12.get_lowest_point( state[ chain.br_1_position ], state[ chain.br_2_position ] )
-    lp23 = chain.c_23.get_lowest_point( state[ chain.br_2_position ], state[ chain.br_3_position ] )
+        c01 = chain.c_01.discretize( state[ chain.br_0_position ], state[ chain.br_1_position ], 10 )
+        c12 = chain.c_12.discretize( state[ chain.br_1_position ], state[ chain.br_2_position ], 10 )
+        c23 = chain.c_23.discretize( state[ chain.br_2_position ], state[ chain.br_3_position ], 10 )
 
-    # cables distance from seafloor [0, 3[
-    constraints[ i, 0 ] = chain.sf.get_distance_to_seafloor( lp01 )
-    constraints[ i, 1 ] = chain.sf.get_distance_to_seafloor( lp12 )
-    constraints[ i, 2 ] = chain.sf.get_distance_to_seafloor( lp23 )
+        # cables distance from seafloor [0, 3[
+        constraints[ i, 0 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c01 ] )
+        constraints[ i, 1 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c12 ] )
+        constraints[ i, 2 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c23 ] )
 
-    lp0 = zeros( (3,) )
-    lp0[ :2 ] = state[ chain.br_0_xy ]
-    lp0[ 2 ] = max( lp01[ 2 ], state[ chain.br_0_z ] )
+        lp0 = zeros( (3,) )
+        lp0[ :2 ] = state[ chain.br_0_position ][ :2 ]
+        lp0[ 2 ] = max( lp01[ 2 ], state[ chain.br_0_position ][ 2 ] )
 
-    lp1 = zeros( (3,) )
-    lp1[ :2 ] = state[ chain.br_1_xy ]
-    lp1[ 2 ] = max( lp01[ 2 ], lp12[ 2 ], state[ chain.br_1_z ] )
+        lp1 = zeros( (3,) )
+        lp1[ :2 ] = state[ chain.br_1_position ][ :2 ]
+        lp1[ 2 ] = max( lp01[ 2 ], lp12[ 2 ], state[ chain.br_1_position ][ 2 ] )
 
-    lp2 = zeros( (3,) )
-    lp2[ :2 ] = state[ chain.br_2_xy ]
-    lp2[ 2 ] = max( lp12[ 2 ], lp23[ 2 ], state[ chain.br_2_z ] )
+        lp2 = zeros( (3,) )
+        lp2[ :2 ] = state[ chain.br_2_position ][ :2 ]
+        lp2[ 2 ] = max( lp12[ 2 ], lp23[ 2 ], state[ chain.br_2_position ][ 2 ] )
 
-    lp3 = zeros( (3,) )
-    lp3[ :2 ] = state[ chain.br_3_xy ]
-    lp3[ 2 ] = max( lp23[ 2 ], state[ chain.br_3_z ] )
+        lp3 = zeros( (3,) )
+        lp3[ :2 ] = state[ chain.br_3_position ][ :2 ]
+        lp3[ 2 ] = max( lp23[ 2 ], state[ chain.br_3_position ][ 2 ] )
 
-    # robot distance from seafloor, taking into accout the cables [3, 7[
-    constraints[ i, 3 ] = chain.sf.get_distance_to_seafloor( lp0 )
-    constraints[ i, 4 ] = chain.sf.get_distance_to_seafloor( lp1 )
-    constraints[ i, 5 ] = chain.sf.get_distance_to_seafloor( lp2 )
-    constraints[ i, 6 ] = chain.sf.get_distance_to_seafloor( lp3 )
+        # robot distance from seafloor, taking into accout the cables [3, 7[
+        constraints[ i, 3 ] = chain.sf.get_distance_to_seafloor( lp0 )
+        constraints[ i, 4 ] = chain.sf.get_distance_to_seafloor( lp1 )
+        constraints[ i, 5 ] = chain.sf.get_distance_to_seafloor( lp2 )
+        constraints[ i, 6 ] = chain.sf.get_distance_to_seafloor( lp3 )
 
-  # horizontal distance between consecutive robots [7, 10[
-  constraints[ :, 7 ] = norm(
-      prediction[ :, chain.br_1_xy ] - prediction[ :, chain.br_0_xy ], axis = 1
-      )
-  constraints[ :, 8 ] = norm(
-      prediction[ :, chain.br_2_xy ] - prediction[ :, chain.br_1_xy ], axis = 1
-      )
-  constraints[ :, 9 ] = norm(
-      prediction[ :, chain.br_3_xy ] - prediction[ :, chain.br_2_xy ], axis = 1
-      )
+    # horizontal distance between consecutive robots [7, 10[
+    constraints[ :, 7 ] = norm(
+            prediction[ :, chain.br_1_position ][ :, :2 ] - prediction[ :, chain.br_0_position ][ :, :2 ], axis=1
+    )
+    constraints[ :, 8 ] = norm(
+            prediction[ :, chain.br_2_position ][ :, :2 ] - prediction[ :, chain.br_1_position ][ :, :2 ], axis=1
+    )
+    constraints[ :, 9 ] = norm(
+            prediction[ :, chain.br_3_position ][ :, :2 ] - prediction[ :, chain.br_2_position ][ :, :2 ], axis=1
+    )
 
-  # distance between consecutive robots [10, 13[
-  constraints[ :, 10 ] = norm(
-      prediction[ :, chain.br_1_position ] - prediction[ :, chain.br_0_position ], axis = 1
-      )
-  constraints[ :, 11 ] = norm(
-      prediction[ :, chain.br_2_position ] - prediction[ :, chain.br_1_position ], axis = 1
-      )
-  constraints[ :, 12 ] = norm(
-      prediction[ :, chain.br_3_position ] - prediction[ :, chain.br_2_position ], axis = 1
-      )
+    # distance between consecutive robots [10, 13[
+    constraints[ :, 10 ] = norm(
+            prediction[ :, chain.br_1_position ] - prediction[ :, chain.br_0_position ], axis=1
+    )
+    constraints[ :, 11 ] = norm(
+            prediction[ :, chain.br_2_position ] - prediction[ :, chain.br_1_position ], axis=1
+    )
+    constraints[ :, 12 ] = norm(
+            prediction[ :, chain.br_3_position ] - prediction[ :, chain.br_2_position ], axis=1
+    )
 
-  return constraints.flatten()
+    return constraints.flatten()
 
 
-def chain_of_4_objective( self: MPC, prediction: ndarray, actuation: ndarray ):
+def chain_of_4_objective( self: MPC, prediction: ndarray, actuation: ndarray ) -> float:
+    chain: ChainOf4WithUSV = self.model.dynamics
+    desired_distance = chain.c_01.length / 2
 
-  chain: ChainOf4WithUSV = self.model.dynamics
-  desired_distance = chain.c_01.length / 2
+    objective = 0.
 
-  objective = 0.
+    # objective += pow( norm( prediction[ :, 0, chain.br_0_velocity ], axis = 1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_1_velocity ], axis=1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_2_velocity ], axis=1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_3_velocity ], axis=1 ).sum(), 2 )
 
-  # objective += pow( norm( prediction[ :, 0, chain.br_0_speed ], axis = 1 ).sum(), 2 )
-  objective += pow( norm( prediction[ :, 0, chain.br_1_speed ], axis = 1 ).sum(), 2 )
-  objective += pow( norm( prediction[ :, 0, chain.br_2_speed ], axis = 1 ).sum(), 2 )
-  objective += pow( norm( prediction[ :, 0, chain.br_3_speed ], axis = 1 ).sum(), 2 )
+    objective += abs(
+            norm(
+                    prediction[ :, 0, chain.br_0_position ] - prediction[ :, 0, chain.br_1_position ], axis=1
+            ) - desired_distance
+    ).sum()
+    objective += abs(
+            norm(
+                    prediction[ :, 0, chain.br_1_position ] - prediction[ :, 0, chain.br_2_position ], axis=1
+            ) - desired_distance
+    ).sum()
+    objective += abs(
+            norm(
+                    prediction[ :, 0, chain.br_2_position ] - prediction[ :, 0, chain.br_3_position ], axis=1
+            ) - desired_distance
+    ).sum()
 
-  objective += abs(
-      norm(
-          prediction[ :, 0, chain.br_0_position ] - prediction[ :, 0, chain.br_1_position ], axis = 1
-          ) - desired_distance
-      ).sum()
-  objective += abs(
-      norm(
-          prediction[ :, 0, chain.br_1_position ] - prediction[ :, 0, chain.br_2_position ], axis = 1
-          ) - desired_distance
-      ).sum()
-  objective += abs(
-      norm(
-          prediction[ :, 0, chain.br_2_position ] - prediction[ :, 0, chain.br_3_position ], axis = 1
-          ) - desired_distance
-      ).sum()
+    return objective
 
-  return objective
+
+if __name__ == '__main__':
+    from numpy import set_printoptions
+    from numpy.random import random
+
+    set_printoptions( precision=2, linewidth=10000, suppress=True )
+
+    ch4 = ChainOf4WithUSV( 0.0, zeros( (3,) ), None, 0.0, 0.0, "runtime" )
+
+    print( f"{ch4.state_size=}" )
+    print( f"{ch4.actuation_size=}" )
+    print( f"{ch4.position=}" )
+    print( f"{ch4.orientation=}" )
+    print( f"{ch4.velocity=}" )
+    print( f"{ch4.body_rates=}" )
+    print( f"{ch4.linear_actuation=}" )
+    print( f"{ch4.angular_actuation=}" )
+
+    print( f"{ch4.br_state_size=}" )
+    print( f"{ch4.br_actuation_size=}" )
+    print( f"{ch4.br_0_position=}" )
+    print( f"{ch4.br_0_orientation=}" )
+    print( f"{ch4.br_0_velocity=}" )
+    print( f"{ch4.br_0_body_rates=}" )
+    print( f"{ch4.br_0_state=}" )
+    print( f"{ch4.br_0_actuation=}" )
+    print( f"{ch4.br_0_perturbation=}" )
+    print( f"{ch4.br_0_linear_actuation=}" )
+    print( f"{ch4.br_0_angular_actuation=}" )
+    print( f"{ch4.br_1_position=}" )
+    print( f"{ch4.br_1_orientation=}" )
+    print( f"{ch4.br_1_velocity=}" )
+    print( f"{ch4.br_1_body_rates=}" )
+    print( f"{ch4.br_1_state=}" )
+    print( f"{ch4.br_1_actuation=}" )
+    print( f"{ch4.br_1_perturbation=}" )
+    print( f"{ch4.br_1_linear_actuation=}" )
+    print( f"{ch4.br_1_angular_actuation=}" )
+    print( f"{ch4.br_2_position=}" )
+    print( f"{ch4.br_2_orientation=}" )
+    print( f"{ch4.br_2_velocity=}" )
+    print( f"{ch4.br_2_body_rates=}" )
+    print( f"{ch4.br_2_state=}" )
+    print( f"{ch4.br_2_actuation=}" )
+    print( f"{ch4.br_2_perturbation=}" )
+    print( f"{ch4.br_2_linear_actuation=}" )
+    print( f"{ch4.br_2_angular_actuation=}" )
+    print( f"{ch4.br_3_position=}" )
+    print( f"{ch4.br_3_orientation=}" )
+    print( f"{ch4.br_3_velocity=}" )
+    print( f"{ch4.br_3_body_rates=}" )
+    print( f"{ch4.br_3_state=}" )
+    print( f"{ch4.br_3_actuation=}" )
+    print( f"{ch4.br_3_perturbation=}" )
+    print( f"{ch4.br_3_linear_actuation=}" )
+    print( f"{ch4.br_3_angular_actuation=}" )
+
+    s = random( (ch4.state_size,) )
+    a = random( (ch4.actuation_size,) )
+    p = random( (ch4.state_size // 2,) )
+    ds = ch4( s, a, p )
+
+    t = random( (10, 1, ch4.state_size // 2) )
+    a = random( (10, 1, ch4.state_size // 2) )
+    e = ch4.compute_error( a, t )
+    print( f"{e=}" )
