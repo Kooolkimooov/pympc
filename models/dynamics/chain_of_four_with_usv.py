@@ -10,7 +10,7 @@ from pympc.models.seafloor import Seafloor
 
 class ChainOf4WithUSV( Dynamics ):
     _state_size = Bluerov().state_size * 4
-    _actuation_size = Bluerov().actuation_size * 4
+    _actuation_size = Bluerov().actuation_size * 3 + USV().actuation_size
 
     _position = r_[ slice( 0, 3 ), slice( 6, 9 ), slice( 12, 15 ), slice( 18, 21 ) ]
     _orientation = r_[ slice( 3, 6 ), slice( 9, 12 ), slice( 15, 18 ), slice( 21, 24 ) ]
@@ -77,8 +77,8 @@ class ChainOf4WithUSV( Dynamics ):
     _br_3_pose = r_[ _br_3_position, _br_3_orientation ]
     _br_3_state = r_[ _br_3_position, _br_3_orientation, _br_3_velocity, _br_3_body_rates ]
 
-    _br_3_linear_actuation = Bluerov().linear_actuation + Bluerov().actuation_size * 3
-    _br_3_angular_actuation = Bluerov().angular_actuation + Bluerov().actuation_size * 3
+    _br_3_linear_actuation = USV().linear_actuation + Bluerov().actuation_size * 3
+    _br_3_angular_actuation = USV().angular_actuation + Bluerov().actuation_size * 3
     _br_3_actuation = r_[ _br_3_linear_actuation, _br_3_angular_actuation ]
 
     _br_3_perturbation = r_[ slice( 3 * _state_size // (2 * 4), 4 * _state_size // (2 * 4) ) ]
@@ -526,7 +526,7 @@ if __name__ == '__main__':
 
     set_printoptions( precision=2, linewidth=10000, suppress=True )
 
-    ch4 = ChainOf4WithUSV( 0.0, zeros( (3,) ), None, 0.0, 0.0, "runtime" )
+    ch4 = ChainOf4WithUSV( 0.0, zeros( (3,) ), None, 0.0, 0.0, "runtime", reference_frame="NED" )
 
     print( f"{ch4.state_size=}" )
     print( f"{ch4.actuation_size=}" )
