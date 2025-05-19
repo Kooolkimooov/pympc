@@ -11,7 +11,6 @@ simplefilter( 'ignore', RuntimeWarning )
 
 
 class ChainOf2( Dynamics ):
-
     _state_size = Bluerov().state_size * 2
     _actuation_size = Bluerov().actuation_size * 2
 
@@ -59,15 +58,14 @@ class ChainOf2( Dynamics ):
     _br_1_perturbation = r_[ slice( _state_size // (2 * 2), _state_size // 2 ) ]
 
     def __init__(
-        self,
-        water_surface_depth: float = 0.,
-        water_current: ndarray = None,
-        cables_length: float = 3.,
-        cables_linear_mass: float = 0.,
-        get_cable_parameter_method = 'runtime',
-        reference_frame: str = 'NED'
-        ):
-
+            self,
+            water_surface_depth: float = 0.,
+            water_current: ndarray = None,
+            cables_length: float = 3.,
+            cables_linear_mass: float = 0.,
+            get_cable_parameter_method='runtime',
+            reference_frame: str = 'NED'
+    ):
         # instanciate two bluerovs to be able to modify their parameters.
         # if both were identical we could just have one instance
         self.br_0 = Bluerov( water_surface_depth, water_current, reference_frame )
@@ -87,8 +85,8 @@ class ChainOf2( Dynamics ):
         state_derivative = zeros( state.shape )
 
         perturbation_01_0, perturbation_01_1 = self.c_01.get_perturbations(
-            state[ self.br_0_position ], state[ self.br_1_position ]
-            )
+                state[ self.br_0_position ], state[ self.br_1_position ]
+        )
 
         # if the cable is taunt the perturbation is None
         # here we should consider any pair with a taunt cable as a single body
@@ -98,8 +96,8 @@ class ChainOf2( Dynamics ):
         else:
             perturbation_01_0, perturbation_01_1 = self.get_taunt_cable_perturbations( state, actuation )
 
-        perturbation_01_0.resize( (self.br_state_size // 2,), refcheck = False )
-        perturbation_01_1.resize( (self.br_state_size // 2,), refcheck = False )
+        perturbation_01_0.resize( (self.br_state_size // 2,), refcheck=False )
+        perturbation_01_1.resize( (self.br_state_size // 2,), refcheck=False )
 
         # cable perturbation is in world frame, should be applied robot frame instead
         br_0_transformation_matrix = self.br_0.build_transformation_matrix( *state[ self.br_0_orientation ] )
@@ -108,30 +106,29 @@ class ChainOf2( Dynamics ):
         perturbation_01_1 = br_1_transformation_matrix.T @ perturbation_01_1
 
         state_derivative[ self.br_0_state ] = self.br_0(
-            state[ self.br_0_state ],
-            actuation[ self.br_0_actuation ],
-            perturbation[ self._br_0_perturbation ] + perturbation_01_0
-            )
+                state[ self.br_0_state ],
+                actuation[ self.br_0_actuation ],
+                perturbation[ self._br_0_perturbation ] + perturbation_01_0
+        )
         state_derivative[ self.br_1_state ] = self.br_1(
-            state[ self.br_1_state ],
-            actuation[ self.br_1_actuation ],
-            perturbation[ self._br_1_perturbation ] + perturbation_01_1
-            )
+                state[ self.br_1_state ],
+                actuation[ self.br_1_actuation ],
+                perturbation[ self._br_1_perturbation ] + perturbation_01_1
+        )
 
         return state_derivative
 
     def compute_error( self, actual: ndarray, target: ndarray ) -> ndarray:
         error = zeros( actual.shape )
         error[ :, :, self.br_0_pose ] = self.br_0.compute_error(
-            actual[ :, :, self.br_0_pose ], target[ :, :, self.br_0_pose ]
-            )
+                actual[ :, :, self.br_0_pose ], target[ :, :, self.br_0_pose ]
+        )
         error[ :, :, self.br_1_pose ] = self.br_1.compute_error(
-            actual[ :, :, self.br_1_pose ], target[ :, :, self.br_1_pose ]
-            )
+                actual[ :, :, self.br_1_pose ], target[ :, :, self.br_1_pose ]
+        )
         return error
 
     def get_taunt_cable_perturbations( self, state: ndarray, actuation: ndarray ) -> tuple:
-
         direction = state[ self.br_1_position ] - state[ self.br_0_position ]
         direction /= norm( direction )
 
@@ -249,7 +246,7 @@ if __name__ == '__main__':
     from numpy import set_printoptions
     from numpy.random import random
 
-    set_printoptions( precision = 2, linewidth = 10000, suppress = True )
+    set_printoptions( precision=2, linewidth=10000, suppress=True )
 
     ch2 = ChainOf2()
 
@@ -287,8 +284,8 @@ if __name__ == '__main__':
     a = random( (ch2.actuation_size,) )
     p = random( (ch2.state_size // 2,) )
     ds = ch2( s, a, p )
-    s[ch2.br_0_position] += 0.
-    s[ch2.br_1_position] += 5.
+    s[ ch2.br_0_position ] += 0.
+    s[ ch2.br_1_position ] += 5.
     ds = ch2( s, a, p )
 
     t = random( (10, 1, ch2.state_size // 2) )

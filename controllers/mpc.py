@@ -1,7 +1,7 @@
 from time import perf_counter
 
 from numpy import diff, eye, inf, ndarray, zeros
-from scipy.optimize import minimize, OptimizeResult
+from scipy.optimize import OptimizeResult, minimize
 
 from pympc.models.model import Model
 

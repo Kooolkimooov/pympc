@@ -39,7 +39,7 @@ if __name__ == '__main__':
     from numpy import set_printoptions
     from numpy.random import random
 
-    set_printoptions( precision = 2, linewidth = 10000, suppress = True )
+    set_printoptions( precision=2, linewidth=10000, suppress=True )
 
     tb = Turtlebot()
 

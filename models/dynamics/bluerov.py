@@ -65,39 +65,38 @@ class Bluerov( Dynamics ):
         self.added_mass_coefficients = [ 6.36, 7.12, 18.68, .189, .135, .222 ]
 
         self.inertial_matrix = self.build_inertial_matrix(
-            self.mass, self.center_of_mass, self.inertial_coefficients
-            ) + diag( self.added_mass_coefficients )
+                self.mass, self.center_of_mass, self.inertial_coefficients
+        ) + diag( self.added_mass_coefficients )
 
         self.inverse_inertial_matrix = inv( self.inertial_matrix )
 
         self.hydrodynamic_matrix = diag( self.hydrodynamic_coefficients )
 
     def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
-
         transform_matrix = self.build_transformation_matrix( *state[ 3:6 ] )
 
         self.buoyancy[ 2 ] = self.vertical_multiplier * rho_eau * G * self.volume * (1. - 1. / (1. + exp(
-            self.vertical_multiplier * 10. * (self.water_surface_depth - state[ 2 ]) - 2.
-            )))
+                self.vertical_multiplier * 10. * (self.water_surface_depth - state[ 2 ]) - 2.
+        )))
 
         hydrostatic_forces = zeros( 6 )
         hydrostatic_forces[ :3 ] = transform_matrix[ :3, :3 ].T @ (self.weight + self.buoyancy)
         hydrostatic_forces[ 3: ] = cross(
-            self.center_of_mass, transform_matrix[ :3, :3 ].T @ self.weight
-            ) + cross(
-            self.center_of_volume, transform_matrix[ :3, :3 ].T @ self.buoyancy
-            )
+                self.center_of_mass, transform_matrix[ :3, :3 ].T @ self.weight
+        ) + cross(
+                self.center_of_volume, transform_matrix[ :3, :3 ].T @ self.buoyancy
+        )
 
         xdot = zeros( state.shape )
         xdot[ :6 ] = transform_matrix @ state[ 6: ]
         xdot[ 6: ] = self.inverse_inertial_matrix @ (-self.hydrodynamic_matrix @ (
-            state[ 6: ] - self.water_current) + hydrostatic_forces + actuation + perturbation)
+                state[ 6: ] - self.water_current) + hydrostatic_forces + actuation + perturbation)
 
         return xdot
 
     def compute_error( self, actual: ndarray, target: ndarray ) -> ndarray:
         error = actual - target
-        error[:, :, self.orientation ] %= pi
+        error[ :, :, self.orientation ] %= pi
         return error
 
     @staticmethod
@@ -132,8 +131,8 @@ class Bluerov( Dynamics ):
 
     @staticmethod
     def build_inertial_matrix(
-        mass: float, center_of_mass: ndarray, inertial_coefficients: list
-        ) -> ndarray:
+            mass: float, center_of_mass: ndarray, inertial_coefficients: list
+    ) -> ndarray:
         inertial_matrix = eye( 6 )
         for i in range( 3 ):
             inertial_matrix[ i, i ] = mass
@@ -169,7 +168,6 @@ class Bluerov( Dynamics ):
 
 
 class BluerovXYZ( Bluerov ):
-
     _actuation_size = 3
 
     _linear_actuation = r_[ slice( 0, 3 ) ]
@@ -192,7 +190,6 @@ class BluerovXYZ( Bluerov ):
 
 
 class BluerovXYZPsi( Bluerov ):
-
     _actuation_size = 4
 
     _linear_actuation = r_[ slice( 0, 3 ) ]
@@ -224,7 +221,6 @@ class BluerovXYZPsi( Bluerov ):
 
 
 class BluerovXZPsi( Bluerov ):
-
     _actuation_size = 3
 
     _linear_actuation = r_[ slice( 0, 2 ) ]
@@ -256,7 +252,6 @@ class BluerovXZPsi( Bluerov ):
 
 
 class USV( Bluerov ):
-
     _actuation_size = 2
 
     _linear_actuation = r_[ 0 ]
@@ -265,7 +260,7 @@ class USV( Bluerov ):
     _six_dof_actuation_mask = r_[ 0, 5 ]
 
     def __init__( self, water_surface_depth: float = 0., reference_frame: str = 'NED' ):
-        super().__init__( water_surface_depth, reference_frame = reference_frame )
+        super().__init__( water_surface_depth, reference_frame=reference_frame )
 
     def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ):
         return Bluerov.__call__( self, state, self.get_six_dof_actuation( actuation ), perturbation )
@@ -294,7 +289,7 @@ if __name__ == '__main__':
     from numpy import set_printoptions
     from numpy.random import random
 
-    set_printoptions( precision = 2, linewidth = 10000, suppress = True )
+    set_printoptions( precision=2, linewidth=10000, suppress=True )
 
     for model in [ Bluerov, BluerovXYZ, BluerovXYZPsi, BluerovXZPsi, USV ]:
         print( model.__name__ )
