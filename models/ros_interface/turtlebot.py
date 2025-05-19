@@ -17,8 +17,8 @@ class TurtlebotROSInterface( Interface ):
   @staticmethod
   def ros_pose_from_state( state: ndarray ) -> Pose:
     pose = Pose()
-    pose.position.x = state[ Turtlebot._position ][ 0 ]
-    pose.position.y = state[ Turtlebot._position ][ 1 ]
+    pose.position.x = state[ Turtlebot._position[ 0 ] ]
+    pose.position.y = state[ Turtlebot._position[ 1 ] ]
 
     quaternion = Rotation.from_euler( 'xyz', array( [ 0, 0, state[ Turtlebot._orientation ] ] ) ).as_quat()
     pose.orientation.x = quaternion[ 0 ]
@@ -31,8 +31,8 @@ class TurtlebotROSInterface( Interface ):
   @staticmethod
   def pose_from_ros_pose( ros_pose: Pose ) -> ndarray:
     pose = zeros( (Turtlebot._state_size // 2,) )
-    pose[ Turtlebot._position ][ 0 ] = ros_pose.position.x
-    pose[ Turtlebot._position ][ 1 ] = ros_pose.position.y
+    pose[ Turtlebot._position[ 0 ] ] = ros_pose.position.x
+    pose[ Turtlebot._position[ 1 ] ] = ros_pose.position.y
     pose[ Turtlebot._orientation ] = Rotation.from_quat(
         [ ros_pose.orientation.x, ros_pose.orientation.y, ros_pose.orientation.z, ros_pose.orientation.w ]
         ).as_euler( 'xyz' )[ 2 ]

@@ -444,20 +444,20 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
         constraints[ i, 2 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c23 ] )
 
         lp0 = zeros( (3,) )
-        lp0[ :2 ] = state[ chain.br_0_position ][ :2 ]
-        lp0[ 2 ] = max( lp01[ 2 ], state[ chain.br_0_position ][ 2 ] )
+        lp0[ :2 ] = state[ chain.br_0_position[ :2 ] ]
+        lp0[ 2 ] = max( lp01[ 2 ], state[ chain.br_0_position[ 2 ] ] )
 
         lp1 = zeros( (3,) )
-        lp1[ :2 ] = state[ chain.br_1_position ][ :2 ]
-        lp1[ 2 ] = max( lp01[ 2 ], lp12[ 2 ], state[ chain.br_1_position ][ 2 ] )
+        lp1[ :2 ] = state[ chain.br_1_position[ :2 ] ]
+        lp1[ 2 ] = max( lp01[ 2 ], lp12[ 2 ], state[ chain.br_1_position[ 2 ] ] )
 
         lp2 = zeros( (3,) )
-        lp2[ :2 ] = state[ chain.br_2_position ][ :2 ]
-        lp2[ 2 ] = max( lp12[ 2 ], lp23[ 2 ], state[ chain.br_2_position ][ 2 ] )
+        lp2[ :2 ] = state[ chain.br_2_position[ :2 ] ]
+        lp2[ 2 ] = max( lp12[ 2 ], lp23[ 2 ], state[ chain.br_2_position[ 2 ] ] )
 
         lp3 = zeros( (3,) )
-        lp3[ :2 ] = state[ chain.br_3_position ][ :2 ]
-        lp3[ 2 ] = max( lp23[ 2 ], state[ chain.br_3_position ][ 2 ] )
+        lp3[ :2 ] = state[ chain.br_3_position[ :2 ] ]
+        lp3[ 2 ] = max( lp23[ 2 ], state[ chain.br_3_position[ 2 ] ] )
 
         # robot distance from seafloor, taking into accout the cables [3, 7[
         constraints[ i, 3 ] = chain.sf.get_distance_to_seafloor( lp0 )
@@ -467,13 +467,13 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
 
     # horizontal distance between consecutive robots [7, 10[
     constraints[ :, 7 ] = norm(
-            prediction[ :, chain.br_1_position ][ :, :2 ] - prediction[ :, chain.br_0_position ][ :, :2 ], axis=1
+            prediction[ :, chain.br_1_position[ :2 ] ] - prediction[ :, chain.br_0_position[ :2 ] ], axis=1
     )
     constraints[ :, 8 ] = norm(
-            prediction[ :, chain.br_2_position ][ :, :2 ] - prediction[ :, chain.br_1_position ][ :, :2 ], axis=1
+            prediction[ :, chain.br_2_position[ :2 ] ] - prediction[ :, chain.br_1_position[ :2 ] ], axis=1
     )
     constraints[ :, 9 ] = norm(
-            prediction[ :, chain.br_3_position ][ :, :2 ] - prediction[ :, chain.br_2_position ][ :, :2 ], axis=1
+            prediction[ :, chain.br_3_position[ :2 ] ] - prediction[ :, chain.br_2_position[ :2 ] ], axis=1
     )
 
     # distance between consecutive robots [10, 13[
