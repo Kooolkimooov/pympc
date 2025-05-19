@@ -290,3 +290,31 @@ class Catenary:
     @staticmethod
     def _optimization_function_1( C, length, dH, two_D_plus_dD ) -> float:
         return pow( length, 2 ) - pow( dH, 2 ) - pow( 2 * sinh( C * two_D_plus_dD / 2 ) / C, 2 )
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    cat = Catenary( length=3.0, get_parameter_method="precompute" )
+
+    # X, Z = meshgrid( cat._two_D_plus_dDs, cat._dHs )
+    # Y = cat._Cs
+    #
+    # ax3d = plt.subplot( 111, projection='3d' )
+    # ax3d.plot_surface(X, Z, Y, cmap='viridis', edgecolor='none')
+    # plt.show()
+
+    X = linspace( -2.5, 2.5, 10 )
+    Z = linspace( -2.5, 2.5, 10 )
+
+    for x in X:
+        for z in Z:
+            p1 = array( [ 0., 0., 0. ] )
+            p2 = array( [ x, 0., z ] )
+
+            P = cat.discretize( p1, p2 )
+
+            ax3d = plt.subplot( 111, projection='3d' )
+            ax3d.plot( *P.T )
+            plt.title(f"{p2=}")
+            plt.show()
