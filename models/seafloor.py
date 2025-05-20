@@ -1,10 +1,10 @@
 from inspect import signature
 
 from numpy import ndarray
+from numpy import sin, exp
 
 
 def seafloor_function_0( x, y ):
-    from numpy import sin, exp
     z = 4.5
     z += 1. * sin( y / 4 )
     z += .5 * sin( x / 3 )
