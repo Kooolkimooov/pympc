@@ -517,6 +517,7 @@ def chain_of_4_objective( self: MPC, prediction: ndarray, actuation: ndarray ) -
             ) - desired_distance
     ).sum()
 
+    objective /= self.horizon
     return objective
 
 
