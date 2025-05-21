@@ -429,6 +429,9 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
     n_constraints = 3 + 4 + 6
     constraints = zeros( (self.horizon, n_constraints) )
 
+    # eliminate this loop
+    # ???
+    # profit
     for i, state in enumerate( prediction ):
         lp01 = chain.c_01.get_lowest_point( state[ chain.br_0_position ], state[ chain.br_1_position ] )
         lp12 = chain.c_12.get_lowest_point( state[ chain.br_1_position ], state[ chain.br_2_position ] )

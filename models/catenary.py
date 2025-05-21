@@ -2,7 +2,20 @@ from json import dump, load
 from pathlib import Path
 
 from numpy import (
-    arccosh, arcsinh, array, cosh, isnan, linspace, log10, logspace, meshgrid, ndarray, sinh, sqrt, zeros,
+    arccosh,
+    arcsinh,
+    array,
+    cosh,
+    isnan,
+    linspace,
+    log10,
+    logspace,
+    meshgrid,
+    ndarray,
+    round,
+    sinh,
+    sqrt,
+    zeros
 )
 from numpy.linalg import norm
 from scipy.optimize import brentq
@@ -180,8 +193,15 @@ class Catenary:
             dump( self._Cs.tolist(), file )
 
     def _get_parameters_precompute( self, p0: ndarray, p1: ndarray ) -> tuple:
+        C = zeros( p0.shape( 1 ) ) if len( p0.shape ) > 1 else 0
+        H = zeros( p0.shape( 1 ) ) if len( p0.shape ) > 1 else 0
         dH = self.vertical_multiplier * (p0[ 2 ] - p1[ 2 ])
-        two_D_plus_dD = norm( p1[ :2 ] - p0[ :2 ] )
+        D = zeros( p0.shape( 1 ) ) if len( p0.shape ) > 1 else 0
+        dD = zeros( p0.shape( 1 ) ) if len( p0.shape ) > 1 else 0
+
+        two_D_plus_dD = norm( p1[ :2 ] - p0[ :2 ], axis=0 )
+
+        C[ isnan( p0[ 0 ] ) or isnan( p1[ 0 ] ) or norm( p1 - p0, axis=0 ) > self.length ] = None
 
         if norm( p1 - p0 ) > 0.99 * self.length or any( isnan( p0 ) ) or any( isnan( p1 ) ):
             return None, None, dH, None, None
@@ -293,28 +313,9 @@ class Catenary:
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
     cat = Catenary( length=3.0, get_parameter_method="precompute" )
 
-    # X, Z = meshgrid( cat._two_D_plus_dDs, cat._dHs )
-    # Y = cat._Cs
-    #
-    # ax3d = plt.subplot( 111, projection='3d' )
-    # ax3d.plot_surface(X, Z, Y, cmap='viridis', edgecolor='none')
-    # plt.show()
+    P0 = array( [ [ 0., 0., 0. ] ] ).repeat( 100, axis=0 )
+    P1 = linspace( [ -3., 0., -3. ], [ 3., 1., 3. ], 100 )
 
-    X = linspace( -2.5, 2.5, 10 )
-    Z = linspace( -2.5, 2.5, 10 )
-
-    for x in X:
-        for z in Z:
-            p1 = array( [ 0., 0., 0. ] )
-            p2 = array( [ x, 0., z ] )
-
-            P = cat.discretize( p1, p2 )
-
-            ax3d = plt.subplot( 111, projection='3d' )
-            ax3d.plot( *P.T )
-            plt.title(f"{p2=}")
-            plt.show()
+    cat( P0.T, P1.T )
