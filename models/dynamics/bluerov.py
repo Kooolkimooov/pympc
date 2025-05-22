@@ -10,6 +10,43 @@ class Bluerov( Dynamics ):
     implementation of the Bluerov model, based on the BlueROV model from Blue Robotics
     parameters of the model are based on the BlueROV2 Heavy configuration
     and are stored in the class as class variables
+
+    Parameters
+    ----------
+    water_surface_depth: float
+        depth of the water surface
+    water_current: ndarray
+        water current in the x, y, z directions
+    reference_frame: str
+        reference frame of the model, either 'NED' or 'ENU'
+
+    Methods
+    -------
+    **\_\_call\_\_**( *ndarray*, *ndarray*, *ndarray* ) -> *ndarray*:
+        evaluates the dynamics
+    **compute_error**( *ndarray*, *ndarray* ) -> *ndarray*:
+        computes the error between two trajectories according to the system definition
+    
+    Properties
+    ----------
+    **state_size**: *int*:
+        size of the expected state vector
+    **actuation_size**: *int*:
+        size of the expected actuation vector
+    **position**: *ndarray*:
+        indices of the position inside the state vector
+    **orientation**: *ndarray*:
+        indices of the orientation inside the state vector
+    **velocity**: *ndarray*:
+        indices of the velocity inside the state vector
+    **body_rates**: *ndarray*:
+        indices of the body rates inside the state vector
+    **linear_actuation**: *ndarray*:
+        indices of the linear actuation inside the actuation vector
+    **angular_actuation**: *ndarray*:
+        indices of the angular actuation inside the actuation vector
+    **six_dof_actuation_mask**: *ndarray*:
+        relation between a full six degrees of freedom actuation and the actuation of the model
     """
 
     _state_size = 12
@@ -28,11 +65,6 @@ class Bluerov( Dynamics ):
     REFERENCE_FRAME = [ 'NED', 'ENU' ]
 
     def __init__( self, water_surface_depth: float = 0., water_current: ndarray = None, reference_frame: str = 'NED' ):
-        """
-        :param water_surface_depth: depth of the water surface
-        :param water_current: current of the water in the world frame
-        :param reference_frame: reference frame of the model, either 'NED' or 'ENU'
-        """
 
         if reference_frame == 'NED':
             self.vertical_multiplier = -1.
@@ -101,10 +133,37 @@ class Bluerov( Dynamics ):
 
     @staticmethod
     def get_six_dof_actuation( actuation: ndarray ) -> ndarray:
+        """
+        uses `six_dof_actuation_mask` to get the six degrees of freedom actuation from the actuation vector
+
+        Parameters
+        ----------
+        actuation : ndarray
+            actuation of shape (actuation_size,)
+
+        Returns
+        -------
+        ndarray
+            actuation of shape (6,)
+        """
         return actuation
 
     @staticmethod
     def build_transformation_matrix( phi: float, theta: float, psi: float ) -> ndarray:
+        """
+        builds the transformation matrix from the body frame to the inertial frame
+
+        Parameters
+        ----------
+        phi : float
+        theta : float
+        psi : float
+
+        Returns
+        -------
+        ndarray
+            transformation matrix of shape (6, 6)
+        """
         cPhi, sPhi = cos( phi ), sin( phi )
         cTheta, sTheta, tTheta = cos( theta ), sin( theta ), tan( theta )
         cPsi, sPsi = cos( psi ), sin( psi )
@@ -133,6 +192,20 @@ class Bluerov( Dynamics ):
     def build_inertial_matrix(
             mass: float, center_of_mass: ndarray, inertial_coefficients: list
     ) -> ndarray:
+        """
+        build the inertial matrix from the mass, center of mass and inertial coefficients
+
+        Parameters
+        ----------
+        mass : float
+        center_of_mass : ndarray
+        inertial_coefficients : list
+
+        Returns
+        -------
+        ndarray
+            inertial matrix of shape (6, 6)
+        """
         inertial_matrix = eye( 6 )
         for i in range( 3 ):
             inertial_matrix[ i, i ] = mass
@@ -168,6 +241,49 @@ class Bluerov( Dynamics ):
 
 
 class BluerovXYZ( Bluerov ):
+    """
+    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue Robotics
+    parameters of the model are based on the BlueROV2 Heavy configuration
+    and are stored in the class as class variables
+
+    Parameters
+    ----------
+    water_surface_depth: float
+        depth of the water surface
+    water_current: ndarray
+        water current in the x, y, z directions
+    reference_frame: str
+        reference frame of the model, either 'NED' or 'ENU'
+
+    Methods
+    -------
+    **\_\_call\_\_**( *ndarray*, *ndarray*, *ndarray* ) -> *ndarray*:
+        evaluates the dynamics
+    **compute_error**( *ndarray*, *ndarray* ) -> *ndarray*:
+        computes the error between two trajectories according to the system definition
+    
+    Properties
+    ----------
+    **state_size**: *int*:
+        size of the expected state vector
+    **actuation_size**: *int*:
+        size of the expected actuation vector
+    **position**: *ndarray*:
+        indices of the position inside the state vector
+    **orientation**: *ndarray*:
+        indices of the orientation inside the state vector
+    **velocity**: *ndarray*:
+        indices of the velocity inside the state vector
+    **body_rates**: *ndarray*:
+        indices of the body rates inside the state vector
+    **linear_actuation**: *ndarray*:
+        indices of the linear actuation inside the actuation vector
+    **angular_actuation**: *ndarray*:
+        indices of the angular actuation inside the actuation vector
+    **six_dof_actuation_mask**: *ndarray*:
+        relation between a full six degrees of freedom actuation and the actuation of the model
+    """
+
     _actuation_size = 3
 
     _linear_actuation = r_[ slice( 0, 3 ) ]
@@ -190,6 +306,49 @@ class BluerovXYZ( Bluerov ):
 
 
 class BluerovXYZPsi( Bluerov ):
+    """
+    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue Robotics
+    parameters of the model are based on the BlueROV2 Heavy configuration
+    and are stored in the class as class variables
+
+    Parameters
+    ----------
+    water_surface_depth: float
+        depth of the water surface
+    water_current: ndarray
+        water current in the x, y, z directions
+    reference_frame: str
+        reference frame of the model, either 'NED' or 'ENU'
+
+    Methods
+    -------
+    **\_\_call\_\_**( *ndarray*, *ndarray*, *ndarray* ) -> *ndarray*:
+        evaluates the dynamics
+    **compute_error**( *ndarray*, *ndarray* ) -> *ndarray*:
+        computes the error between two trajectories according to the system definition
+    
+    Properties
+    ----------
+    **state_size**: *int*:
+        size of the expected state vector
+    **actuation_size**: *int*:
+        size of the expected actuation vector
+    **position**: *ndarray*:
+        indices of the position inside the state vector
+    **orientation**: *ndarray*:
+        indices of the orientation inside the state vector
+    **velocity**: *ndarray*:
+        indices of the velocity inside the state vector
+    **body_rates**: *ndarray*:
+        indices of the body rates inside the state vector
+    **linear_actuation**: *ndarray*:
+        indices of the linear actuation inside the actuation vector
+    **angular_actuation**: *ndarray*:
+        indices of the angular actuation inside the actuation vector
+    **six_dof_actuation_mask**: *ndarray*:
+        relation between a full six degrees of freedom actuation and the actuation of the model
+    """
+
     _actuation_size = 4
 
     _linear_actuation = r_[ slice( 0, 3 ) ]
@@ -221,6 +380,49 @@ class BluerovXYZPsi( Bluerov ):
 
 
 class BluerovXZPsi( Bluerov ):
+    """
+    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue Robotics
+    parameters of the model are based on the BlueROV2 Heavy configuration
+    and are stored in the class as class variables
+
+    Parameters
+    ----------
+    water_surface_depth: float
+        depth of the water surface
+    water_current: ndarray
+        water current in the x, y, z directions
+    reference_frame: str
+        reference frame of the model, either 'NED' or 'ENU'
+
+    Methods
+    -------
+    **\_\_call\_\_**( *ndarray*, *ndarray*, *ndarray* ) -> *ndarray*:
+        evaluates the dynamics
+    **compute_error**( *ndarray*, *ndarray* ) -> *ndarray*:
+        computes the error between two trajectories according to the system definition
+    
+    Properties
+    ----------
+    **state_size**: *int*:
+        size of the expected state vector
+    **actuation_size**: *int*:
+        size of the expected actuation vector
+    **position**: *ndarray*:
+        indices of the position inside the state vector
+    **orientation**: *ndarray*:
+        indices of the orientation inside the state vector
+    **velocity**: *ndarray*:
+        indices of the velocity inside the state vector
+    **body_rates**: *ndarray*:
+        indices of the body rates inside the state vector
+    **linear_actuation**: *ndarray*:
+        indices of the linear actuation inside the actuation vector
+    **angular_actuation**: *ndarray*:
+        indices of the angular actuation inside the actuation vector
+    **six_dof_actuation_mask**: *ndarray*:
+        relation between a full six degrees of freedom actuation and the actuation of the model
+    """
+
     _actuation_size = 3
 
     _linear_actuation = r_[ slice( 0, 2 ) ]
@@ -252,6 +454,49 @@ class BluerovXZPsi( Bluerov ):
 
 
 class USV( Bluerov ):
+    """
+    implementation of the Bluerov model **with reduced actuation capabilities as to represent a surface vehicle**, based on the BlueROV model from Blue Robotics
+    parameters of the model are based on the BlueROV2 Heavy configuration
+    and are stored in the class as class variables
+
+    Parameters
+    ----------
+    water_surface_depth: float
+        depth of the water surface
+    water_current: ndarray
+        water current in the x, y, z directions
+    reference_frame: str
+        reference frame of the model, either 'NED' or 'ENU'
+
+    Methods
+    -------
+    **\_\_call\_\_**( *ndarray*, *ndarray*, *ndarray* ) -> *ndarray*:
+        evaluates the dynamics
+    **compute_error**( *ndarray*, *ndarray* ) -> *ndarray*:
+        computes the error between two trajectories according to the system definition
+    
+    Properties
+    ----------
+    **state_size**: *int*:
+        size of the expected state vector
+    **actuation_size**: *int*:
+        size of the expected actuation vector
+    **position**: *ndarray*:
+        indices of the position inside the state vector
+    **orientation**: *ndarray*:
+        indices of the orientation inside the state vector
+    **velocity**: *ndarray*:
+        indices of the velocity inside the state vector
+    **body_rates**: *ndarray*:
+        indices of the body rates inside the state vector
+    **linear_actuation**: *ndarray*:
+        indices of the linear actuation inside the actuation vector
+    **angular_actuation**: *ndarray*:
+        indices of the angular actuation inside the actuation vector
+    **six_dof_actuation_mask**: *ndarray*:
+        relation between a full six degrees of freedom actuation and the actuation of the model
+    """
+
     _actuation_size = 2
 
     _linear_actuation = r_[ 0 ]

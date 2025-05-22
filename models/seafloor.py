@@ -16,14 +16,75 @@ def seafloor_function_0( x, y ):
 
 
 class Seafloor:
+    """
+    abstract class for the seafloor
+
+    Methods
+    -------
+    **get_distance_to_seafloor**( *ndarray* ) -> *float*:
+        get the vertical distance to the seafloor from a point in 3D space
+    **get_seafloor_depth**( *ndarray* ) -> *float*:
+        get the depth of the seafloor at a point on the x-y plane
+        if the point is 3d, the z coordinate is ignored
+    """
+
     def get_distance_to_seafloor( self, point: ndarray ) -> float:
+        """
+        get the vertical distance to the seafloor from a point in 3D space
+
+        Parameters
+        ----------
+        point : ndarray
+            point in 3D space with shape (3,)
+
+        Returns
+        -------
+        float
+            vertical distance to the seafloor from the point
+        """
         raise NotImplementedError()
 
     def get_seafloor_depth( self, point: ndarray ) -> float:
+        """
+        get the depth of the seafloor at a point on the x-y plane
+        if the point is 3d, the z coordinate is ignored
+
+        Parameters
+        ----------
+        point : ndarray
+            point on the x-y plane 
+
+        Returns
+        -------
+        float
+            depth of the seafloor at the point
+        """
         raise NotImplementedError()
 
 
 class SeafloorFromFunction( Seafloor ):
+    """
+    implementation of the seafloor class that uses a function to define the seafloor
+
+    Parameters
+    ----------
+    seafloor : callable
+        a function that takes two arguments (x, y) and returns the depth of the seafloor
+
+    Methods
+    -------
+    **get_distance_to_seafloor**( *ndarray* ) -> *float*:
+        get the vertical distance to the seafloor from a point in 3D space
+    **get_seafloor_depth**( *ndarray* ) -> *float*:
+        get the depth of the seafloor at a point on the x-y plane
+        if the point is 3d, the z coordinate is ignored
+
+    Attributes
+    ----------
+    seafloor_function : callable
+        a function that takes two arguments (x, y) and returns the depth of the seafloor
+    """
+
     def __init__( self, seafloor: callable ):
         assert list( signature( seafloor ).parameters ) == [ 'x', 'y' ], 'provided function has irregular signature'
         self.seafloor_function = seafloor

@@ -6,8 +6,49 @@ from pympc.utils import runge_kutta_4
 
 class Model:
     """
-    wrapper class for dynamics that stores the state,  integrates the system one time step with ability to record the
-    states and actuations
+    wrapper class for dynamics that stores the state, integrates the system and with ability to record the states and
+    actuations
+
+    Parameters
+    ----------
+    dynamics: Dynamics 
+        function that describes the dynamics of the system, must have the following signature: f(state, actuation, **kwargs)
+    time_step: float
+        time step of the simulation
+    initial_state: ndarray
+        initial state of the system
+    initial_actuation: ndarray
+        initial actuation of the system
+    initial_perturbation: ndarray
+        initial perturbation of the system
+    record: bool
+        whether to record the states and actuations
+
+    Methods
+    -------
+    **step**():
+        integrates the system one time step. record the state and actuation if record is True
+
+    Attributes
+    ----------
+    dynamics: Dynamics 
+        function that describes the dynamics of the system
+    time_step: float
+        time step of the simulation
+    state: ndarray
+        current state of the system
+    actuation: ndarray
+        current actuation of the system
+    perturbation: ndarray
+        current perturbation of the system
+    record: bool
+        whether to record the states and actuations
+    previous_states: list[ndarray] 
+        list of previous states
+    previous_actuations: list[ndarray]
+        list of previous actuations
+    previous_perturbations: list[ndarray]
+        list of previous perturbations
     """
 
     def __init__(
@@ -19,16 +60,6 @@ class Model:
             initial_perturbation: ndarray = None,
             record: bool = False
     ):
-        """
-        :param dynamics: function that describes the dynamics of the system, must have the following signature: f(
-        state, actuation, **kwargs)
-        :param time_step: time step of the simulation
-        :param initial_state: initial state of the system
-        :param initial_actuation: initial actuation of the system
-        :param kwargs: additional keyword arguments for dynamics
-        :param record: whether to record the states and actuations
-        """
-
         self.dynamics = dynamics
         self.time_step = time_step
 

@@ -6,6 +6,32 @@ from pympc.models.dynamics.dynamics import Dynamics
 class Turtlebot( Dynamics ):
     """
     Implements the dynamics of the Turtlebot model
+
+    Methods
+    -------
+    **\_\_call\_\_**( *ndarray*, *ndarray*, *ndarray* ) -> *ndarray*:
+        evaluates the dynamics
+    **compute_error**( *ndarray*, *ndarray* ) -> *ndarray*:
+        computes the error between two trajectories according to the system definition
+
+    Properties
+    ----------
+    **state_size**: *int*:
+        size of the expected state vector
+    **actuation_size**: *int*:
+        size of the expected actuation vector
+    **position**: *ndarray*:
+        indices of the position inside the state vector
+    **orientation**: *ndarray*:
+        indices of the orientation inside the state vector
+    **velocity**: *ndarray*:
+        indices of the velocity inside the state vector
+    **body_rates**: *ndarray*:
+        indices of the body rates inside the state vector
+    **linear_actuation**: *ndarray*:
+        indices of the linear actuation inside the actuation vector
+    **angular_actuation**: *ndarray*:
+        indices of the angular actuation inside the actuation vector
     """
 
     _state_size = 6
