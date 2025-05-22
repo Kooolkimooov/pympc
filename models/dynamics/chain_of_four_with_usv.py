@@ -1,4 +1,4 @@
-from numpy import dot, ndarray, r_, zeros
+from numpy import dot, linspace, ndarray, r_, zeros
 from numpy.linalg import norm
 
 from pympc.controllers.mpc import MPC
@@ -424,7 +424,6 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
     prediction = prediction[ :, 0 ]
 
     # 3 constraints on cables (distance of lowest point to seafloor)
-    # 4 constraints on robots (distance of lowest point to seafloor)
     # 6 on inter robot_distance (3 horizontal, 2 3d)
     n_constraints = 3 + 6
     constraints = zeros( (self.horizon, n_constraints) )
@@ -433,14 +432,33 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
     # ???
     # profit
     for i, state in enumerate( prediction ):
-        c01 = chain.c_01.discretize( state[ chain.br_0_position ], state[ chain.br_1_position ], 10 )
-        c12 = chain.c_12.discretize( state[ chain.br_1_position ], state[ chain.br_2_position ], 10 )
-        c23 = chain.c_23.discretize( state[ chain.br_2_position ], state[ chain.br_3_position ], 10 )
+        c01 = chain.c_01.get_lowest_point( state[ chain.br_0_position ], state[ chain.br_1_position ] )
+        c12 = chain.c_12.get_lowest_point( state[ chain.br_1_position ], state[ chain.br_2_position ] )
+        c23 = chain.c_23.get_lowest_point( state[ chain.br_2_position ], state[ chain.br_3_position ] )
+
+        c01 = linspace(
+                [ *state[ chain.br_0_position[ :2 ] ], c01[ 2 ] ],
+                [ *state[ chain.br_1_position[ :2 ] ], c01[ 2 ] ],
+                5,
+                axis=1
+        )
+        c12 = linspace(
+                [ *state[ chain.br_1_position[ :2 ] ], c12[ 2 ] ],
+                [ *state[ chain.br_2_position[ :2 ] ], c12[ 2 ] ],
+                5,
+                axis=1
+        )
+        c23 = linspace(
+                [ *state[ chain.br_2_position[ :2 ] ], c23[ 2 ] ],
+                [ *state[ chain.br_3_position[ :2 ] ], c23[ 2 ] ],
+                5,
+                axis=1
+        )
 
         # cables distance from seafloor [0, 3[
-        constraints[ i, 0 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c01 ] )
-        constraints[ i, 1 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c12 ] )
-        constraints[ i, 2 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c23 ] )
+        constraints[ i, 0 ] = min( chain.sf.get_distance_to_seafloor( c01 ) )
+        constraints[ i, 1 ] = min( chain.sf.get_distance_to_seafloor( c12 ) )
+        constraints[ i, 2 ] = min( chain.sf.get_distance_to_seafloor( c23 ) )
 
     # horizontal distance between consecutive robots [7, 10[
     constraints[ :, 3 ] = norm(
