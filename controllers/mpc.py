@@ -20,6 +20,7 @@ class MPC:
             objective: callable = None,
             time_steps_per_actuation: int = 1,
             guess_from_last_solution: bool = True,
+            use_cache_prediction: bool = True,
             tolerance: float = 1e-6,
             max_number_of_iteration: int = 1000,
             bounds: tuple = None,
@@ -40,6 +41,7 @@ class MPC:
         actuation)
         :param time_steps_per_actuation: number of time steps per proposed actuation over the horizon
         :param guess_from_last_solution: whether to use the last solution as the initial guess
+        :param use_cache_prediction: whether to cache the predictions to speed up the optimization, uses more memory
         :param tolerance: tolerance for the optimization algorithm
         :param max_number_of_iteration: maximum number of iterations for the optimization algorithm
         :param bounds: bounds for the optimization variables
@@ -87,9 +89,7 @@ class MPC:
 
         add_one = (1 if self.horizon % self.time_steps_per_actuation != 0 else 0)
         self.result_shape = (
-                self.horizon // self.time_steps_per_actuation + add_one,
-                1,
-                self.model.actuation.shape[ 0 ]
+                self.horizon // self.time_steps_per_actuation + add_one, 1, self.model.actuation.shape[ 0 ]
         )
 
         self.raw_result = OptimizeResult( x=zeros( self.result_shape, ) )
@@ -125,6 +125,9 @@ class MPC:
             self.compute_times = [ ]
 
         self.verbose = verbose
+
+        self.prediction_cache = { }
+        self.use_prediction_cache = use_cache_prediction
 
     def compute_actuation( self ) -> ndarray:
         """
@@ -182,8 +185,7 @@ class MPC:
         predicted_trajectory = prediction[ :, :, :self.model.state.shape[ 0 ] // 2 ]
 
         error = self.model.dynamics.compute_error(
-                predicted_trajectory,
-                self.target_trajectory[ :self.horizon ]
+                predicted_trajectory, self.target_trajectory[ :self.horizon ]
         )
 
         cost += (error @ self.pose_weight_matrix @ error.transpose( (0, 2, 1) )).sum()
@@ -226,15 +228,21 @@ class MPC:
         return self.objective( prediction, actuation )
 
     def _predict_non_linear( self, actuation: ndarray ) -> ndarray:
+        if self.use_prediction_cache:
+            current_state = self.model.state
+            key = (current_state.tobytes() + actuation.tobytes()).hex()
+            cache = self.prediction_cache
+            if key in cache:
+                return cache[ key ]
         state = self.model.state.copy()
-
         predicted_trajectory = zeros( (self.horizon, 1, self.model.state.shape[ 0 ]) )
         for i in range( self.horizon ):
             state += self.model.dynamics(
                     state, actuation[ i, 0 ], self.model.perturbation
             ) * self.time_step
             predicted_trajectory[ i ] = state
-
+        if self.use_prediction_cache:
+            cache[ key ] = predicted_trajectory
         return predicted_trajectory
 
     def _predict_linear( self, actuation: ndarray ) -> ndarray:
