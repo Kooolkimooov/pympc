@@ -426,17 +426,13 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
     # 3 constraints on cables (distance of lowest point to seafloor)
     # 4 constraints on robots (distance of lowest point to seafloor)
     # 6 on inter robot_distance (3 horizontal, 2 3d)
-    n_constraints = 3 + 4 + 6
+    n_constraints = 3 + 6
     constraints = zeros( (self.horizon, n_constraints) )
 
     # eliminate this loop
     # ???
     # profit
     for i, state in enumerate( prediction ):
-        lp01 = chain.c_01.get_lowest_point( state[ chain.br_0_position ], state[ chain.br_1_position ] )
-        lp12 = chain.c_12.get_lowest_point( state[ chain.br_1_position ], state[ chain.br_2_position ] )
-        lp23 = chain.c_23.get_lowest_point( state[ chain.br_2_position ], state[ chain.br_3_position ] )
-
         c01 = chain.c_01.discretize( state[ chain.br_0_position ], state[ chain.br_1_position ], 10 )
         c12 = chain.c_12.discretize( state[ chain.br_1_position ], state[ chain.br_2_position ], 10 )
         c23 = chain.c_23.discretize( state[ chain.br_2_position ], state[ chain.br_3_position ], 10 )
@@ -446,47 +442,25 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
         constraints[ i, 1 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c12 ] )
         constraints[ i, 2 ] = min( [ chain.sf.get_distance_to_seafloor( p ) for p in c23 ] )
 
-        lp0 = zeros( (3,) )
-        lp0[ :2 ] = state[ chain.br_0_position[ :2 ] ]
-        lp0[ 2 ] = max( lp01[ 2 ], state[ chain.br_0_position[ 2 ] ] )
-
-        lp1 = zeros( (3,) )
-        lp1[ :2 ] = state[ chain.br_1_position[ :2 ] ]
-        lp1[ 2 ] = max( lp01[ 2 ], lp12[ 2 ], state[ chain.br_1_position[ 2 ] ] )
-
-        lp2 = zeros( (3,) )
-        lp2[ :2 ] = state[ chain.br_2_position[ :2 ] ]
-        lp2[ 2 ] = max( lp12[ 2 ], lp23[ 2 ], state[ chain.br_2_position[ 2 ] ] )
-
-        lp3 = zeros( (3,) )
-        lp3[ :2 ] = state[ chain.br_3_position[ :2 ] ]
-        lp3[ 2 ] = max( lp23[ 2 ], state[ chain.br_3_position[ 2 ] ] )
-
-        # robot distance from seafloor, taking into accout the cables [3, 7[
-        constraints[ i, 3 ] = chain.sf.get_distance_to_seafloor( lp0 )
-        constraints[ i, 4 ] = chain.sf.get_distance_to_seafloor( lp1 )
-        constraints[ i, 5 ] = chain.sf.get_distance_to_seafloor( lp2 )
-        constraints[ i, 6 ] = chain.sf.get_distance_to_seafloor( lp3 )
-
     # horizontal distance between consecutive robots [7, 10[
-    constraints[ :, 7 ] = norm(
+    constraints[ :, 3 ] = norm(
             prediction[ :, chain.br_1_position[ :2 ] ] - prediction[ :, chain.br_0_position[ :2 ] ], axis=1
     )
-    constraints[ :, 8 ] = norm(
+    constraints[ :, 4 ] = norm(
             prediction[ :, chain.br_2_position[ :2 ] ] - prediction[ :, chain.br_1_position[ :2 ] ], axis=1
     )
-    constraints[ :, 9 ] = norm(
+    constraints[ :, 5 ] = norm(
             prediction[ :, chain.br_3_position[ :2 ] ] - prediction[ :, chain.br_2_position[ :2 ] ], axis=1
     )
 
     # distance between consecutive robots [10, 13[
-    constraints[ :, 10 ] = norm(
+    constraints[ :, 6 ] = norm(
             prediction[ :, chain.br_1_position ] - prediction[ :, chain.br_0_position ], axis=1
     )
-    constraints[ :, 11 ] = norm(
+    constraints[ :, 7 ] = norm(
             prediction[ :, chain.br_2_position ] - prediction[ :, chain.br_1_position ], axis=1
     )
-    constraints[ :, 12 ] = norm(
+    constraints[ :, 8 ] = norm(
             prediction[ :, chain.br_3_position ] - prediction[ :, chain.br_2_position ], axis=1
     )
 
