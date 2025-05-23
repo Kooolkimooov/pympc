@@ -391,8 +391,8 @@ class MPC:
     def _get_actuation_from_actual( self, candidate: ndarray ) -> tuple:
         actuation = candidate.reshape( self.result_shape )
         actuation = actuation.repeat( self.time_steps_per_actuation, axis=0 )
-        actuation_derivatives = diff( actuation, prepend=[ [ self.model.actuation ] ], axis=0 ) / self.time_step
         actuation = actuation[ :self.horizon ]
+        actuation_derivatives = diff( actuation, prepend=[ [ self.model.actuation ] ], axis=0 ) / self.time_step
 
         return actuation, actuation_derivatives
 
