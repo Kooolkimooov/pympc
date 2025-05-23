@@ -65,7 +65,6 @@ class Bluerov( Dynamics ):
     REFERENCE_FRAME = [ 'NED', 'ENU' ]
 
     def __init__( self, water_surface_depth: float = 0., water_current: ndarray = None, reference_frame: str = 'NED' ):
-
         if reference_frame == 'NED':
             self.vertical_multiplier = -1.
         elif reference_frame == 'ENU':
@@ -242,7 +241,8 @@ class Bluerov( Dynamics ):
 
 class BluerovXYZ( Bluerov ):
     """
-    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue Robotics
+    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue
+    Robotics
     parameters of the model are based on the BlueROV2 Heavy configuration
     and are stored in the class as class variables
 

@@ -1,7 +1,6 @@
 from inspect import signature
 
-from numpy import ndarray
-from numpy import sin, exp, asarray
+from numpy import asarray, exp, ndarray, sin
 
 
 def seafloor_function_0( x, y ):

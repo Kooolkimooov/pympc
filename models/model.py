@@ -12,7 +12,8 @@ class Model:
     Parameters
     ----------
     dynamics: Dynamics 
-        function that describes the dynamics of the system, must have the following signature: f(state, actuation, **kwargs)
+        function that describes the dynamics of the system, must have the following signature: f(state, actuation,
+        **kwargs)
     time_step: float
         time step of the simulation
     initial_state: ndarray

@@ -47,7 +47,6 @@ class Catenary:
         linear mass of the cable
     """
 
-
     GET_PARAMETER_METHOD = [ 'runtime', 'precompute' ]
     REFERENCE_FRAME = [ 'NED', 'ENU' ]
 
@@ -90,7 +89,8 @@ class Catenary:
         tuple:
             - **float**: the parameter C of the catenary; set to None if out of safe search space
             - **float**: the vertical sag H of the catenary; set to None if out of safe search space and 2D+ΔD > length
-            - **float**: the vertical distance ΔH between attachment points; set to None if out of safe search space and 2D+ΔD > length
+            - **float**: the vertical distance ΔH between attachment points; set to None if out of safe search space
+            and 2D+ΔD > length
             - **float**: the horizontal half-length D; set to None if out of safe search space and 2D+ΔD > length
             - **float**: horizontal asymmetric length ΔD; set to None if out of safe search space and 2D+ΔD > length
         ndarray: 
@@ -99,7 +99,8 @@ class Catenary:
             - **ndarray**: the perturbations force on p0
             - **ndarray**: the perturbations force on p1
         ndarray: 
-            the shape of the catenary with 100 curvilinearly discretized points (x, y, z) are on the second dimension of the array.
+            the shape of the catenary with 100 curvilinearly discretized points (x, y, z) are on the second dimension
+            of the array.
         """
 
         C, H, dH, D, dD = self.get_parameters( p0, p1 )
@@ -186,7 +187,8 @@ class Catenary:
         tuple:
             - **float**: the parameter C of the catenary; set to None if out of safe search space
             - **float**: the vertical sag H of the catenary; set to None if out of safe search space and 2D+ΔD > length
-            - **float**: the vertical distance ΔH between attachment points; set to None if out of safe search space and 2D+ΔD > length
+            - **float**: the vertical distance ΔH between attachment points; set to None if out of safe search space
+            and 2D+ΔD > length
             - **float**: the horizontal half-length D; set to None if out of safe search space and 2D+ΔD > length
             - **float**: horizontal asymmetric length ΔD; set to None if out of safe search space and 2D+ΔD > length
         """

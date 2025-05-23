@@ -70,7 +70,8 @@ class AugmentedCatenary( Catenary ):
         tuple:
             - **float**: the parameter C of the catenary; set to None if out of safe search space
             - **float**: the vertical sag H of the catenary; set to None if out of safe search space and 2D+ΔD > length
-            - **float**: the vertical distance ΔH between attachment points; set to None if out of safe search space and 2D+ΔD > length
+            - **float**: the vertical distance ΔH between attachment points; set to None if out of safe search space
+            and 2D+ΔD > length
             - **float**: the horizontal half-length D; set to None if out of safe search space and 2D+ΔD > length
             - **float**: horizontal asymmetric length ΔD; set to None if out of safe search space and 2D+ΔD > length
         ndarray: 
@@ -189,7 +190,7 @@ class AugmentedCatenary( Catenary ):
         points = self._augmented_rotation( points, p0, gamma_rotation, theta_rotation )
 
         return points
-    
+
     def get_parameters( self, p0: ndarray, p1: ndarray ) -> tuple:
         """
         computes the parameters of the catenary
@@ -235,5 +236,5 @@ class AugmentedCatenary( Catenary ):
             p0: ndarray,
             gamma_rotation: ndarray,
             theta_rotation: ndarray
-            ) -> ndarray:
+    ) -> ndarray:
         return (p - p0) @ theta_rotation.T @ gamma_rotation + p0

@@ -86,7 +86,8 @@ class MPC:
         maximum number of iterations for the optimization algorithm
     **bounds**: *Bounds* | tuple(Bounds):
         bounds for the optimization variables
-    **constraints**: *LinearConstraints* | NonLinearConstraints | tuple(LinearConstraints) | tuple(NonLinearConstraints):
+    **constraints**: *LinearConstraints* | NonLinearConstraints | tuple(LinearConstraints) | tuple(
+    NonLinearConstraints):
         constraints for the optimization problem
     **pose_weight_matrix**: *ndarray*:
         weight matrix for the pose error; shape: (horizon, state_size//2, state_size//2)
@@ -121,7 +122,7 @@ class MPC:
     **result_shape**: *tuple*:
         shape of the result array; (horizon, 1, actuation_size)
     """
-     
+
     MODEL_TYPE = [ 'linear', 'nonlinear' ]
     OPTIMIZE_ON = [ 'actuation_derivative', 'actuation' ]
 
@@ -147,7 +148,6 @@ class MPC:
             record: bool = False,
             verbose: bool = False
     ):
-
         if model_type == 'linear':
             self.predict = self._predict_linear
         elif model_type == 'nonlinear':
@@ -210,7 +210,7 @@ class MPC:
         self.best_candidate = zeros( self.result_shape )
 
         self.record = record
-            
+
         self.predicted_trajectories = [ ]
         self.candidate_actuations = [ ]
         self.compute_times = [ ]
@@ -371,7 +371,7 @@ class MPC:
                     state, actuation[ i, 0 ], self.model.perturbation
             ) * self.time_step
             predicted_trajectory[ i ] = state
-    
+
         if self.use_prediction_cache:
             cache[ key ] = predicted_trajectory
 

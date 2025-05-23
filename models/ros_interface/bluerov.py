@@ -26,7 +26,8 @@ class BluerovROSInterface( Interface ):
                 [
                         BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G *
                         BluerovROSInterface.cos_angle,
-                        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G * BluerovROSInterface.cos_angle,
+                        BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G *
+                        BluerovROSInterface.cos_angle,
                         BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G,
                         BluerovROSInterface.n_thrusters * BluerovROSInterface.max_kg_force * G *
                         BluerovROSInterface.distance_from_com,
