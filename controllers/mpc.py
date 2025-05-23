@@ -7,6 +7,121 @@ from pympc.models.model import Model
 
 
 class MPC:
+    """
+    implements a model predictive controller for a given model. 
+
+    PREDICTION ASSUMES THAT THE MODELS STATE IS X = [POSE, POSE_DERIVATIVE]
+    
+    Parameters
+    ----------
+    model: Model
+        model of the system
+    horizon: int
+        prediction horizon
+    target_trajectory: ndarray
+        target trajectory
+    objective: callable
+        objective function, must have the following signature: f(trajectory, actuation)
+    time_steps_per_actuation: int
+        number of time steps per proposed actuation over the horizon
+    guess_from_last_solution: bool
+        whether to use the last solution as the initial guess
+    use_cache_prediction: bool
+        whether to cache the predictions to speed up the optimization, uses more memory
+    tolerance: float
+        tolerance for the optimization algorithm
+    max_number_of_iteration: int
+        maximum number of iterations for the optimization algorithm
+    bounds: Bounds | tuble(Bounds)
+        bounds for the optimization variables
+    constraints: LinearConstraints | NonLinearConstraints | tuple(LinearConstraints) | tuple(NonLinearConstraints)
+        constraints for the optimization variables
+    pose_weight_matrix: ndarray
+        weight matrix for the pose error; shape: (state_dim//2, state_dim//2)
+    actuation_weight_matrix: ndarray
+        weight matrix for the actuation derivative; shape: (actuation_dim, actuation_dim)
+    objective_weight: float
+        weight for the objective function
+    final_weight: float
+        weight for the final pose error
+    record: bool 
+        whether to record the computation times, predicted trajectories and candidate actuations
+    verbose: bool
+        whether to print the optimization results
+
+    Methods
+    -------
+    **compute_actuation**():
+        computes the best actuation for the current state of the model
+    **compute_result**():
+        computes an actionable actuation from `raw_result` depending on the configuration
+    **cost**( *ndarray* ):
+        cost function for the optimization
+    **predict**( *ndarray* ):
+        predicts the trajectory given the candidate actuation over the horizon
+    **get_actuation**( *ndarray* ):
+        computes an actionable actuation over the horizon from the candidate actuation depending on the configuration
+    **get_objective**():
+        computes the objective function value for the current state of the model
+    
+    Properties
+    ----------
+    **model**: *Model*:
+        model of the system
+    **horizon**: *int*:
+        prediction horizon
+    **target_trajectory**: *ndarray*:
+        target trajectory
+    **objective**: *callable*:
+        objective function, must have the following signature: f(trajectory, actuation)
+    **time_step**: *float*:
+        time step of the MPC prediction, defaults to the model time step
+    **time_steps_per_actuation**: *int*:
+        number of time steps per proposed actuation over the horizon
+    **guess_from_last_solution**: *bool*:
+        whether to use the last solution as the initial guess
+    **tolerance**: *float*:
+        tolerance for the optimization algorithm
+    **max_number_of_iteration**: *int*:
+        maximum number of iterations for the optimization algorithm
+    **bounds**: *Bounds* | tuple(Bounds):
+        bounds for the optimization variables
+    **constraints**: *LinearConstraints* | NonLinearConstraints | tuple(LinearConstraints) | tuple(NonLinearConstraints):
+        constraints for the optimization problem
+    **pose_weight_matrix**: *ndarray*:
+        weight matrix for the pose error; shape: (horizon, state_size//2, state_size//2)
+    **actuation_weight_matrix**: *ndarray*:
+        weight matrix for the actuation derivative; shape: (horizon, actuation_size, actuation_size)
+    **objective_weight**: *float*:
+        weight for the objective function
+    **final_weight**: *float*:
+        weight for the final pose error
+    **use_prediction_cache**: *bool*:
+        whether to cache the predictions to speed up the optimization, uses more memory
+    **prediction_cache**: *dict*:
+        cache for the predicted trajectories
+    **record**: *bool*:
+        whether to record the computation times, predicted trajectories and candidate actuations
+    **verbose**: *bool*:
+        whether to print the optimization results
+    **predicted_trajectories**: *list*:
+        list of predicted trajectories; reset before each optimization
+    **candidate_actuations**: *list*:
+        list of candidate actuations; reset before each optimization
+    **compute_times**: *list*:
+        list of computation times
+    **best_cost**: *float*:
+        best cost found during the optimization
+    **best_candidate**: *ndarray*:
+        best candidate found during the optimization; returned if optimization fails
+    **result**: *ndarray*:
+        best actuation found during the optimization
+    **raw_result**: *OptimizeResult*:
+        raw result of the optimization
+    **result_shape**: *tuple*:
+        shape of the result array; (horizon, 1, actuation_size)
+    """
+     
     MODEL_TYPE = [ 'linear', 'nonlinear' ]
     OPTIMIZE_ON = [ 'actuation_derivative', 'actuation' ]
 
@@ -32,30 +147,6 @@ class MPC:
             record: bool = False,
             verbose: bool = False
     ):
-        """
-        PREDICTION ASSUMES THAT THE MODELS STATE IS X = [POSE, POSE_DERIVATIVE]
-        :param model: model of the system
-        :param horizon: prediction horizon
-        :param target_trajectory: target trajectory
-        :param objective: objective function, must have the following signature: f(trajectory,
-        actuation)
-        :param time_steps_per_actuation: number of time steps per proposed actuation over the horizon
-        :param guess_from_last_solution: whether to use the last solution as the initial guess
-        :param use_cache_prediction: whether to cache the predictions to speed up the optimization, uses more memory
-        :param tolerance: tolerance for the optimization algorithm
-        :param max_number_of_iteration: maximum number of iterations for the optimization algorithm
-        :param bounds: bounds for the optimization variables
-        :param constraints: constraints for the optimization variables
-        :param pose_weight_matrix: weight matrix for the pose error; shape: (state_dim//2,
-        state_dim//2)
-        :param actuation_weight_matrix: weight matrix for the actuation derivative; shape:
-        (actuation_dim, actuation_dim)
-        :param objective_weight: weight for the objective function
-        :param final_weight: weight for the final pose error
-        :param record: whether to record the computation times, predicted trajectories and candidate
-        actuations
-        :param verbose: whether to print the optimization results
-        """
 
         if model_type == 'linear':
             self.predict = self._predict_linear
@@ -119,21 +210,26 @@ class MPC:
         self.best_candidate = zeros( self.result_shape )
 
         self.record = record
-        if self.record:
-            self.predicted_trajectories = [ ]
-            self.candidate_actuations = [ ]
-            self.compute_times = [ ]
+            
+        self.predicted_trajectories = [ ]
+        self.candidate_actuations = [ ]
+        self.compute_times = [ ]
 
         self.verbose = verbose
 
-        self.prediction_cache = { }
         self.use_prediction_cache = use_cache_prediction
+
+        self.prediction_cache = { }
 
     def compute_actuation( self ) -> ndarray:
         """
         computes the best actuation for the current state with a given horizon. records the computation
         time if record is True and returns the best actuation
-        :return: best actuation
+
+        Returns
+        -------
+        ndarray:
+            best actuation for the next step; shape = (actuation_size,)
         """
 
         if self.record:
@@ -166,7 +262,7 @@ class MPC:
 
     def compute_result( self ):
         """
-        computes the best actuation from scipy.optimize raw result and store it in self.result
+        computes the best actuation from scipy.optimize raw result and store it in self.result 
         """
         raise NotImplementedError( 'predict method should have been implemented in __init__' )
 
@@ -174,7 +270,16 @@ class MPC:
         """
         cost function for the optimization. records the predicted trajectories and candidate actuation
         :param candidate: proposed actuation derivative over the horizon
-        :return: cost
+
+        Parameters
+        ----------
+        candidate: ndarray
+            proposed solution for the optimization problem; shape = (horizon, 1, actuation_size)
+
+        Returns
+        -------
+        float:
+            cost of the candidate for the optimization
         """
 
         actuation, actuation_derivatives = self.get_actuation( candidate )
@@ -212,14 +317,37 @@ class MPC:
     def predict( self, actuation: ndarray ) -> ndarray:
         """
         predicts the trajectory given the proposed actuation over the horizon
+
         ASSUMES THAT THE MODELS STATE IS X = [POSE, POSE_DERIVATIVE]
-        :param actuation: proposed actuation over the horizon
-        :param with_speed: whether to return the predicted speed as well
-        :return: predicted trajectory
+
+        Parameters
+        ----------
+        actuation: ndarray 
+            proposed actuation over the horizon
+        
+        Returns
+        -------
+        ndarray:
+            predicted trajectory given the proposed actuation over the horizon; shape = (horizon, 1, state_size)
         """
         raise NotImplementedError( 'predict method should have been implemented in __init__' )
 
     def get_actuation( self, candidate: ndarray ) -> tuple:
+        """
+        computes an actionable actuation over the horizon from the candidate actuation
+
+        Parameters
+        ----------
+        candidate : ndarray
+            proposed solution for the optimization problem; shape = (horizon, 1, actuation_size)
+
+        Returns
+        -------
+        actuation: ndarray
+            proposed actuation over the horizon; shape = (horizon, 1, actuation_size)
+        actuation_derivatives: ndarray
+            proposed actuation derivative over the horizon; shape = (horizon, 1, actuation_size)
+        """
         raise NotImplementedError( 'predict method should have been implemented in __init__' )
 
     def get_objective( self ) -> float:
@@ -234,15 +362,19 @@ class MPC:
             cache = self.prediction_cache
             if key in cache:
                 return cache[ key ]
+
         state = self.model.state.copy()
         predicted_trajectory = zeros( (self.horizon, 1, self.model.state.shape[ 0 ]) )
+
         for i in range( self.horizon ):
             state += self.model.dynamics(
                     state, actuation[ i, 0 ], self.model.perturbation
             ) * self.time_step
             predicted_trajectory[ i ] = state
+    
         if self.use_prediction_cache:
             cache[ key ] = predicted_trajectory
+
         return predicted_trajectory
 
     def _predict_linear( self, actuation: ndarray ) -> ndarray:

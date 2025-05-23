@@ -7,9 +7,6 @@ from pympc.models.catenary import Catenary
 from pympc.models.dynamics.bluerov import BluerovXYZPsi as Bluerov
 from pympc.models.seafloor import Seafloor
 
-simplefilter( 'ignore', RuntimeWarning )
-
-
 class ChainOf3WithFixedPoint:
     state_size = 3 * Bluerov.state_size
     actuation_size = 2 * Bluerov.actuation_size
