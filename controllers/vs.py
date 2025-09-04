@@ -1,7 +1,8 @@
 from time import perf_counter
 
-from numpy import arctan2, cos, cosh, eye, ndarray, sin, sinh, sqrt, zeros
+from numpy import arctan2, cos, cosh, eye, ndarray, sin, sinh, sqrt, zeros, cross, identity, array
 from numpy.linalg import pinv
+from scipy.spatial.transform import Rotation
 
 from pympc.models.catenary import Catenary
 
@@ -75,6 +76,7 @@ class VS:
             target_feature: ndarray,
             cable_length: float = 1.0,
             maximum_H: float = None,
+            maximum_dH: float = None,
             gain: float = 1.0,
             actuation_projection_matrix: ndarray = None,
             reference_frame: str = 'NED',
@@ -86,6 +88,9 @@ class VS:
 
         if leader_pose.flatten().shape[ 0 ] != 6 or follower_pose.flatten().shape[ 0 ] != 6:
             raise ValueError( 'pose should be of size 6' )
+        
+        if target_feature.flatten().shape[ 0 ] != 3:
+            raise ValueError( 'target_feature should be of size 3' )
 
         if maximum_H is not None and (maximum_H <= 0 or maximum_H > cable_length / 2):
             raise ValueError( 'maximum_H must be lower than half the cable length and positive' )
@@ -102,13 +107,20 @@ class VS:
         )
 
         if actuation_projection_matrix is None:
-            self.actuation_projection_matrix = eye( 6 )
+            self.actuation_projection_matrix = eye(6)
 
         self.raw_result = zeros( (6,) )
         self.result = zeros( (self.actuation_projection_matrix.shape[ 0 ],) )
 
         if maximum_H is None:
             self.maximum_H = self.catenary.length / 2
+        else:
+            self.maximum_H = maximum_H
+
+        if maximum_dH is None:
+            self.maximum_dH = self.catenary.length / 2
+        else:
+            self.maximum_dH = maximum_dH
 
         self.gain = gain
 
@@ -138,31 +150,69 @@ class VS:
         delta = cable_angle - follower_angle
         angle = arctan2( sin( delta ), cos( delta ) )
 
-        C, H, _, D, dD = self.catenary.get_parameters( self.leader_pose[ :3 ], self.follower_pose[ :3 ] )
+        C, H, dH, D, dD = self.catenary.get_parameters( self.leader_pose[ :3 ], self.follower_pose[ :3 ] )
+        L = self.catenary.length
 
-        feature = ndarray( [ H / self.maximum_H, sin( angle ) ] )
+        a = H / self.maximum_H
+        b = sin( angle )
+        c = ( dH + self.maximum_dH ) / ( 2 * self.maximum_dH )
 
-        R = sinh( (D + dD) * C ) / C  # catenary half length
-        Kc = 2 * (pow( R, 2 ) + pow( H, 2 )) / pow( pow( R, 2 ) - pow( H, 2 ), 2 )
-        Kh = sinh( C * D ) / (1 + Kc * (cosh( C * D ) - 1 - C * D * sinh( C * D )) / pow( C, 2 ))
+        feature = array( [ a, b, c ] )
 
-        interaction_matrix = zeros( (6, 2) )
-        interaction_matrix[ 0, 0 ] = -Kh * sqrt( 1 - pow( feature[ 1 ], 2 ) ) / (2 * self.maximum_H)
-        interaction_matrix[ 1, 0 ] = -Kh * feature[ 1 ] / (2 * self.maximum_H)
-        interaction_matrix[ 5, 0 ] = Kh * (
-                self.leader_pose[ 1 ] * sqrt( 1 - pow( feature[ 1 ], 2 ) ) - self.leader_pose[ 0 ] * feature[ 1 ]) / (
-                                             2 * self.maximum_H)
-        interaction_matrix[ 0, 1 ] = -feature[ 1 ] * sqrt( 1 - pow( feature[ 1 ], 2 ) ) / (2 * D)
-        interaction_matrix[ 0, 2 ] = (-1 + pow( feature[ 1 ], 2 )) / (2 * D)
-        interaction_matrix[ 5, 1 ] = - (
-                self.leader_pose[ 1 ] * feature[ 1 ] * sqrt( 1 - pow( feature[ 1 ], 2 ) ) + self.leader_pose[
-            0 ] * (1 - pow( feature[ 1 ], 2 ))) / (2 * D)
+        p = array([2 * D + dD, 0, dH]) @ Rotation.from_euler('z', follower_angle).as_matrix().T
+
+        T = zeros( (3, 6) )
+        T[:3, :3] = eye( 3 )
+        T[:3, 3:] = -cross(identity(p.shape[0]) * -1, p)
+        T *= -1
+
+        LD = H - D * sinh( C * D )
+        LdD = H + dH - ( D + dD ) * sinh( C * ( D + dD ) )
+
+        Cn = 2 * H + dH + 2 * L * sqrt(H * (H + dH) / pow(L, 2) - pow(dH, 2))
+        Cd = pow(L, 2) - pow(2 * H + dH, 2)
+
+        dCndH = 2 + L * (2 * H + dH) / sqrt(H * (H + dH) * pow(L, 2) - pow(dH, 2))
+        dCddH = -4 * (2 * H + dH)
+        dCnddH = 1 + (L * H * (pow(L, 2) + 2 * H * dH + pow(dH, 2))) / (pow(pow(H, 2) - pow(dH, 2), 1.5) * sqrt(H * ( H + dH)))
+        dCdddH = -2 * (2 * H + dH)
+
+        dCdH = 2 * (dCndH * Cd - dCddH * Cn) / pow(Cd, 2)
+        dCddH = 2 * (dCnddH * Cd - dCdddH * Cn) / pow(Cd, 2)
+
+        u = (C + LdD * dCdH) / (C * sinh( C * (D + dD)))
+        p = (C + LD * dCdH) / (C * sinh( C * D))
+        q = (LD * dCdH) / (C * sinh(C * D))
+        v = (C + LdD * dCddH) / (C * sinh( C * (D + dD)))
+
+        M = zeros( (3, 3) )
+        M[0, 0] = sqrt(1 - pow( b, 2)) / ((u + p) * self.maximum_H)
+        M[0, 1] = b / ((u + p) * self.maximum_H)
+        M[0, 2] = (v + q) / ((u + p) * self.maximum_H)
+
+        M[1, 0] = -b * sqrt(1 - pow( b, 2)) / ( 2 * D + dD )
+        M[1, 1] = (1 - pow( b, 2)) / ( 2 * D + dD )
+
+        M[2, 2] = 1 / ( 2 * self.maximum_dH )
+
+        interaction_matrix = M @ T
 
         self.raw_result = -self.gain * pinv( interaction_matrix ) @ (feature - self.target_feature)
 
+        self.result = self.actuation_projection_matrix @ self.raw_result
+        
         if self.record:
             self.compute_times.append( perf_counter() - ti )
 
-        self.result = self.actuation_projection_matrix @ self.raw_result
+        if self.verbose:
+            print(f'{C=}\t{H=}\t{dH=}\t{D=}\t{dD=}')
+            print(f'{feature=}')
+            print(f'{angle=}')
+            print(f'{M=}')
+            print(f'{T=}')
+            print(f'{interaction_matrix=}')
+            print(f'{self.raw_result=}')
+            print(f'{self.result=}')
+            if self.record: print(f'{self.compute_times[-1]=}')
 
         return self.result
