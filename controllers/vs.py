@@ -9,7 +9,7 @@ from pympc.models.catenary import Catenary
 class VS:
     """
     implements a pseudo visual servoing controller for tethered robots.
-    DOI: 10.1109/ICRA.2017.7989090,
+    Based on DOI: 10.1109/ICRA.2017.7989090,
     https://www.researchgate.net/publication/317740842_Catenary-based_Visual_Servoing_for_Tethered_Robots
 
     Parameters
@@ -38,13 +38,22 @@ class VS:
     -------
     **compute_actuation**():
         computes the best actuation for the current state of the model
-    **compute_result**():
-        computes an actionable actuation from `raw_result` depending on the configuration
 
     Properties
     ----------
-    **target_trajectory**: *ndarray*:
-        target trajectory
+    **leader_pose**: *ndarray*:
+        the pose of the leader
+    **follower_pose**: *ndarray*:
+        the pose of the follower
+    **target_feature**: *ndarray*:
+        target feature in the form [H / H_max, sin(α)] with alpha the angle
+        between the orientation of the robot and the orientation of the catenary
+    **catenary**: *Catenary*:
+        the catenary model used to model the cable
+    **gain**: *float*:
+        gain of the controller
+    **maximum_H**: *float*:
+        maximum allowed value of the catenary sag H
     **record**: *bool*:
         whether to record the computation times, predicted trajectories and candidate actuations
     **verbose**: *bool*:
@@ -53,7 +62,7 @@ class VS:
         list of computation times
     **result**: *ndarray*:
         best actuation found during the optimization
-    **raw_result**: *OptimizeResult*:
+    **raw_result**: *ndarray*:
         raw result of the optimization
     """
 
@@ -129,7 +138,7 @@ class VS:
         delta = cable_angle - follower_angle
         angle = arctan2( sin( delta ), cos( delta ) )
 
-        C, H, dH, D, dD = self.catenary.get_parameters( self.leader_pose[ :3 ], self.follower_pose[ :3 ] )
+        C, H, _, D, dD = self.catenary.get_parameters( self.leader_pose[ :3 ], self.follower_pose[ :3 ] )
 
         feature = ndarray( [ H / self.maximum_H, sin( angle ) ] )
 
@@ -154,12 +163,6 @@ class VS:
         if self.record:
             self.compute_times.append( perf_counter() - ti )
 
-        self.compute_result()
+        self.result = self.actuation_projection_matrix @ self.raw_result
 
         return self.result
-
-    def compute_result( self ):
-        """
-        computes the best actuation from scipy.optimize raw result and store it in self.result
-        """
-        self.result = self.actuation_projection_matrix @ self.raw_result

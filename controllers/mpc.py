@@ -284,14 +284,14 @@ class MPC:
 
         actuation, actuation_derivatives = self.get_actuation( candidate )
 
-        cost = 0.
-
         prediction = self.predict( actuation )
         predicted_trajectory = prediction[ :, :, :self.model.state.shape[ 0 ] // 2 ]
 
         error = self.model.dynamics.compute_error(
                 predicted_trajectory, self.target_trajectory[ :self.horizon ]
         )
+
+        cost = 0.
 
         cost += (error @ self.pose_weight_matrix @ error.transpose( (0, 2, 1) )).sum()
         cost += (actuation_derivatives @ self.actuation_weight_matrix @ actuation_derivatives.transpose(
