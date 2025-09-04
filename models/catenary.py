@@ -199,7 +199,7 @@ class Catenary:
         raise NotImplementedError( 'optimization_function method should have been implemented in __init__' )
 
     def _get_parameters_runtime( self, p0: ndarray, p1: ndarray ) -> tuple:
-        dH = self.vertical_multiplier * (p0[ 2 ] - p1[ 2 ])
+        dH = float(self.vertical_multiplier * (p0[ 2 ] - p1[ 2 ]))
         two_D_plus_dD = norm( p1[ :2 ] - p0[ :2 ] )
 
         if norm( p1 - p0 ) > 0.99 * self.length or any( isnan( p0 ) ) or any( isnan( p1 ) ):
