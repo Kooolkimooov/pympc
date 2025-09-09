@@ -1,7 +1,9 @@
-from numpy import dot, linspace, ndarray, r_, zeros
+from numpy import diff, dot, linspace, ndarray, r_, zeros
 from numpy.linalg import norm
+from numpy.ma.core import concatenate
 
 from pympc.controllers.mpc import MPC
+from pympc.controllers.pp import PP
 from pympc.models.catenary import Catenary
 from pympc.models.dynamics.bluerov import BluerovXYZPsi as Bluerov, USV
 from pympc.models.dynamics.dynamics import Dynamics
@@ -415,7 +417,7 @@ class ChainOf4WithUSV( Dynamics ):
         return self._br_3_perturbation
 
 
-def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
+def chain_of_4_constraints_mpc( self: MPC, candidate: ndarray ) -> ndarray:
     chain: ChainOf4WithUSV = self.model.dynamics
 
     actuation, _ = self.get_actuation( candidate )
@@ -485,9 +487,113 @@ def chain_of_4_constraints( self: MPC, candidate: ndarray ) -> ndarray:
     return constraints.flatten()
 
 
-def chain_of_4_objective( self: MPC, prediction: ndarray, actuation: ndarray ) -> float:
+def chain_of_4_objective_mpc( self: MPC, prediction: ndarray, actuation: ndarray ) -> float:
     chain: ChainOf4WithUSV = self.model.dynamics
     desired_distance = chain.c_01.length / 2
+
+    objective = 0.
+
+    # objective += pow( norm( prediction[ :, 0, chain.br_0_velocity ], axis = 1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_1_velocity ], axis=1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_2_velocity ], axis=1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_3_velocity ], axis=1 ).sum(), 2 )
+
+    objective += abs(
+            norm(
+                    prediction[ :, 0, chain.br_0_position ] - prediction[ :, 0, chain.br_1_position ], axis=1
+            ) - desired_distance
+    ).sum()
+    objective += abs(
+            norm(
+                    prediction[ :, 0, chain.br_1_position ] - prediction[ :, 0, chain.br_2_position ], axis=1
+            ) - desired_distance
+    ).sum()
+    objective += abs(
+            norm(
+                    prediction[ :, 0, chain.br_2_position ] - prediction[ :, 0, chain.br_3_position ], axis=1
+            ) - desired_distance
+    ).sum()
+
+    objective /= self.horizon
+    return objective
+
+
+def chain_of_4_constraints_pp( self: PP, candidate: ndarray ) -> ndarray:
+    chain: ChainOf4WithUSV = self.model.dynamics
+
+    candidate = candidate.reshape( self.result_shape )
+    prediction = candidate[ :, 0 ]
+
+    # 3 constraints on cables (distance of lowest point to seafloor)
+    # 6 on inter robot_distance (3 horizontal, 2 3d)
+    n_constraints = 3 + 6
+    constraints = zeros( (self.horizon, n_constraints) )
+
+    # eliminate this loop
+    # ???
+    # profit
+    for i, state in enumerate( prediction ):
+        c01 = chain.c_01.get_lowest_point( state[ chain.br_0_position ], state[ chain.br_1_position ] )
+        c12 = chain.c_12.get_lowest_point( state[ chain.br_1_position ], state[ chain.br_2_position ] )
+        c23 = chain.c_23.get_lowest_point( state[ chain.br_2_position ], state[ chain.br_3_position ] )
+
+        c01 = linspace(
+                [ *state[ chain.br_0_position[ :2 ] ], c01[ 2 ] ],
+                [ *state[ chain.br_1_position[ :2 ] ], c01[ 2 ] ],
+                5,
+                axis=1
+        )
+        c12 = linspace(
+                [ *state[ chain.br_1_position[ :2 ] ], c12[ 2 ] ],
+                [ *state[ chain.br_2_position[ :2 ] ], c12[ 2 ] ],
+                5,
+                axis=1
+        )
+        c23 = linspace(
+                [ *state[ chain.br_2_position[ :2 ] ], c23[ 2 ] ],
+                [ *state[ chain.br_3_position[ :2 ] ], c23[ 2 ] ],
+                5,
+                axis=1
+        )
+
+        # cables distance from seafloor [0, 3[
+        constraints[ i, 0 ] = min( chain.sf.get_distance_to_seafloor( c01 ) )
+        constraints[ i, 1 ] = min( chain.sf.get_distance_to_seafloor( c12 ) )
+        constraints[ i, 2 ] = min( chain.sf.get_distance_to_seafloor( c23 ) )
+
+    # horizontal distance between consecutive robots [7, 10[
+    constraints[ :, 3 ] = norm(
+            prediction[ :, chain.br_1_position[ :2 ] ] - prediction[ :, chain.br_0_position[ :2 ] ], axis=1
+    )
+    constraints[ :, 4 ] = norm(
+            prediction[ :, chain.br_2_position[ :2 ] ] - prediction[ :, chain.br_1_position[ :2 ] ], axis=1
+    )
+    constraints[ :, 5 ] = norm(
+            prediction[ :, chain.br_3_position[ :2 ] ] - prediction[ :, chain.br_2_position[ :2 ] ], axis=1
+    )
+
+    # distance between consecutive robots [10, 13[
+    constraints[ :, 6 ] = norm(
+            prediction[ :, chain.br_1_position ] - prediction[ :, chain.br_0_position ], axis=1
+    )
+    constraints[ :, 7 ] = norm(
+            prediction[ :, chain.br_2_position ] - prediction[ :, chain.br_1_position ], axis=1
+    )
+    constraints[ :, 8 ] = norm(
+            prediction[ :, chain.br_3_position ] - prediction[ :, chain.br_2_position ], axis=1
+    )
+
+    return constraints.flatten()
+
+
+def chain_of_4_objective_pp( self: PP, trajectory: ndarray ) -> float:
+    chain: ChainOf4WithUSV = self.model.dynamics
+    desired_distance = chain.c_01.length / 2
+
+    trajectory = trajectory.reshape( self.result_shape )
+    speed = diff( trajectory, prepend=[ [ self.model.state[ :chain.state_size // 2 ] ] ], axis=0 ) / self.time_step
+
+    prediction = concatenate( [ trajectory, speed ], axis=2 )
 
     objective = 0.
 
