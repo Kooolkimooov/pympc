@@ -43,6 +43,8 @@ class Dynamics:
     _linear_actuation = None
     _angular_actuation = None
 
+    _six_dof_actuation_mask = None
+
     def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
         """
         evaluates the dynamics
@@ -120,3 +122,11 @@ class Dynamics:
     def angular_actuation( self ) -> ndarray:
         """indices of the angular actuation inside the actuation vector"""
         return self._angular_actuation
+
+    @property
+    def six_dof_actuation_mask( self ) -> ndarray:
+        """
+        relation between a full six degrees of freedom actuation and the actuation of the model;
+        useful for underactuated systems
+        """
+        return self._six_dof_actuation_mask

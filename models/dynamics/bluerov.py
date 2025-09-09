@@ -230,14 +230,6 @@ class Bluerov( Dynamics ):
 
         return inertial_matrix
 
-    @property
-    def six_dof_actuation_mask( self ) -> ndarray:
-        """
-        relation between a full six degrees of freedom actuation and the actuation of the model;
-        useful for reduced actuation models derived from this one
-        """
-        return self._six_dof_actuation_mask
-
 
 class BluerovXYZ( Bluerov ):
     """
