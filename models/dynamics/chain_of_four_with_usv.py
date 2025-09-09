@@ -85,6 +85,10 @@ class ChainOf4WithUSV( Dynamics ):
 
     _br_3_perturbation = r_[ slice( 3 * _state_size // (2 * 4), 4 * _state_size // (2 * 4) ) ]
 
+    _six_dof_actuation_mask = r_[
+        Bluerov().six_dof_actuation_mask, Bluerov().six_dof_actuation_mask + 6, Bluerov().six_dof_actuation_mask +
+                                          12, USV().six_dof_actuation_mask + 18 ]
+
     def __init__(
             self,
             water_surface_depth: float,
