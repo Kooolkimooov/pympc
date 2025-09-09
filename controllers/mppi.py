@@ -139,7 +139,7 @@ class MPPI( MPC ):
 
         self.verbose = verbose
 
-    def compute_actuation( self ):
+    def step( self ):
         """
         computes the best actuation for the current state with a given horizon. records the computation
         time if record is True

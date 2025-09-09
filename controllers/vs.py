@@ -37,7 +37,7 @@ class VS:
 
     Methods
     -------
-    **compute_actuation**():
+    **step**():
         computes the best actuation for the current state of the model
 
     Properties
@@ -129,7 +129,7 @@ class VS:
         self.record = record
         self.verbose = verbose
 
-    def compute_actuation( self ) -> ndarray:
+    def step( self ) -> ndarray:
         """
         computes the best actuation for the current state with a given horizon. records the computation
         time if record is True and returns the best actuation
