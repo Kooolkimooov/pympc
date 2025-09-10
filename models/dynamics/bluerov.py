@@ -104,7 +104,10 @@ class Bluerov( Dynamics ):
         self.hydrodynamic_matrix = diag( self.hydrodynamic_coefficients )
 
     def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
-        transform_matrix = self.build_transformation_matrix( *state[ 3:6 ] )
+        transform_matrix = self.get_body_to_world_transform( state )
+
+        six_dof_actuation = zeros( (6,) )
+        six_dof_actuation[ self.six_dof_actuation_mask ] = actuation
 
         self.buoyancy[ 2 ] = self.vertical_multiplier * rho_eau * G * self.volume * (1. - 1. / (1. + exp(
                 self.vertical_multiplier * 10. * (self.water_surface_depth - state[ 2 ]) - 2.
@@ -121,7 +124,7 @@ class Bluerov( Dynamics ):
         xdot = zeros( state.shape )
         xdot[ :6 ] = transform_matrix @ state[ 6: ]
         xdot[ 6: ] = self.inverse_inertial_matrix @ (-self.hydrodynamic_matrix @ (
-                state[ 6: ] - self.water_current) + hydrostatic_forces + actuation + perturbation)
+                state[ 6: ] - self.water_current) + hydrostatic_forces + six_dof_actuation + perturbation)
 
         return xdot
 
@@ -130,39 +133,9 @@ class Bluerov( Dynamics ):
         error[ :, :, self.orientation ] %= pi
         return error
 
-    @staticmethod
-    def get_six_dof_actuation( actuation: ndarray ) -> ndarray:
-        """
-        uses `six_dof_actuation_mask` to get the six degrees of freedom actuation from the actuation vector
+    def get_body_to_world_transform( self, state: ndarray ) -> ndarray:
+        phi, theta, psi = state[ self.orientation ]
 
-        Parameters
-        ----------
-        actuation : ndarray
-            actuation of shape (actuation_size,)
-
-        Returns
-        -------
-        ndarray
-            actuation of shape (6,)
-        """
-        return actuation
-
-    @staticmethod
-    def build_transformation_matrix( phi: float, theta: float, psi: float ) -> ndarray:
-        """
-        builds the transformation matrix from the body frame to the inertial frame
-
-        Parameters
-        ----------
-        phi : float
-        theta : float
-        psi : float
-
-        Returns
-        -------
-        ndarray
-            transformation matrix of shape (6, 6)
-        """
         cPhi, sPhi = cos( phi ), sin( phi )
         cTheta, sTheta, tTheta = cos( theta ), sin( theta ), tan( theta )
         cPsi, sPsi = cos( psi ), sin( psi )
@@ -283,23 +256,11 @@ class BluerovXYZ( Bluerov ):
 
     _six_dof_actuation_mask = r_[ slice( 0, 3 ) ]
 
-    def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
-        return Bluerov.__call__( self, state, self.get_six_dof_actuation( actuation ), perturbation )
-
-    @staticmethod
-    def get_six_dof_actuation( actuation ):
-        six_dof_actuation = zeros( (6,) )
-        six_dof_actuation[ :3 ] = actuation
-        return six_dof_actuation
-
-    @staticmethod
-    def build_transformation_matrix( phi: float, theta: float, psi: float ) -> ndarray:
-        return eye( 6 )
-
 
 class BluerovXYZPsi( Bluerov ):
     """
-    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue Robotics
+    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue
+    Robotics
     parameters of the model are based on the BlueROV2 Heavy configuration
     and are stored in the class as class variables
 
@@ -348,32 +309,11 @@ class BluerovXYZPsi( Bluerov ):
 
     _six_dof_actuation_mask = r_[ slice( 0, 3 ), 5 ]
 
-    def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
-        return Bluerov.__call__( self, state, self.get_six_dof_actuation( actuation ), perturbation )
-
-    @staticmethod
-    def get_six_dof_actuation( actuation: ndarray ) -> ndarray:
-        new_actuation = zeros( (6,) )
-        new_actuation[ :3 ] = actuation[ :3 ]
-        new_actuation[ 5 ] = actuation[ 3 ]
-        return new_actuation
-
-    @staticmethod
-    def build_transformation_matrix( phi: float, theta: float, psi: float ) -> ndarray:
-        cPsi, sPsi = cos( psi ), sin( psi )
-
-        matrix = eye( 6 )
-        matrix[ 0, 0 ] = cPsi
-        matrix[ 0, 1 ] = -sPsi
-        matrix[ 1, 0 ] = sPsi
-        matrix[ 1, 1 ] = cPsi
-
-        return matrix
-
 
 class BluerovXZPsi( Bluerov ):
     """
-    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue Robotics
+    implementation of the Bluerov model **with reduced actuation capabilities**, based on the BlueROV model from Blue
+    Robotics
     parameters of the model are based on the BlueROV2 Heavy configuration
     and are stored in the class as class variables
 
@@ -422,32 +362,11 @@ class BluerovXZPsi( Bluerov ):
 
     six_dof_actuation_mask = r_[ 0, 2, 5 ]
 
-    def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ) -> ndarray:
-        return Bluerov.__call__( self, state, self.get_six_dof_actuation( actuation ), perturbation )
-
-    @staticmethod
-    def get_six_dof_actuation( actuation ):
-        six_dof_actuation = zeros( (6,) )
-        six_dof_actuation[ :3:2 ] = actuation[ :2 ]
-        six_dof_actuation[ 5 ] = actuation[ 2 ]
-        return six_dof_actuation
-
-    @staticmethod
-    def build_transformation_matrix( phi: float, theta: float, psi: float ) -> ndarray:
-        cPsi, sPsi = cos( psi ), sin( psi )
-
-        matrix = eye( 6 )
-        matrix[ 0, 0 ] = cPsi
-        matrix[ 0, 1 ] = -sPsi
-        matrix[ 1, 0 ] = sPsi
-        matrix[ 1, 1 ] = cPsi
-
-        return matrix
-
 
 class USV( Bluerov ):
     """
-    implementation of the Bluerov model **with reduced actuation capabilities as to represent a surface vehicle**, based on the BlueROV model from Blue Robotics
+    implementation of the Bluerov model **with reduced actuation capabilities as to represent a surface vehicle**,
+    based on the BlueROV model from Blue Robotics
     parameters of the model are based on the BlueROV2 Heavy configuration
     and are stored in the class as class variables
 
@@ -495,31 +414,6 @@ class USV( Bluerov ):
     _angular_actuation = r_[ 1 ]
 
     _six_dof_actuation_mask = r_[ 0, 5 ]
-
-    def __init__( self, water_surface_depth: float = 0., reference_frame: str = 'NED' ):
-        super().__init__( water_surface_depth, reference_frame=reference_frame )
-
-    def __call__( self, state: ndarray, actuation: ndarray, perturbation: ndarray ):
-        return Bluerov.__call__( self, state, self.get_six_dof_actuation( actuation ), perturbation )
-
-    @staticmethod
-    def get_six_dof_actuation( actuation ):
-        six_dof_actuation = zeros( (6,) )
-        six_dof_actuation[ 0 ] = actuation[ 0 ]
-        six_dof_actuation[ 5 ] = actuation[ 1 ]
-        return six_dof_actuation
-
-    @staticmethod
-    def build_transformation_matrix( phi: float, theta: float, psi: float ) -> ndarray:
-        cPsi, sPsi = cos( psi ), sin( psi )
-
-        matrix = eye( 6 )
-        matrix[ 0, 0 ] = cPsi
-        matrix[ 0, 1 ] = -sPsi
-        matrix[ 1, 0 ] = sPsi
-        matrix[ 1, 1 ] = cPsi
-
-        return matrix
 
 
 if __name__ == '__main__':

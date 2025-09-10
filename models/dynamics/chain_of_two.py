@@ -100,8 +100,8 @@ class ChainOf2( Dynamics ):
         perturbation_01_1.resize( (self.br_state_size // 2,), refcheck=False )
 
         # cable perturbation is in world frame, should be applied robot frame instead
-        br_0_transformation_matrix = self.br_0.build_transformation_matrix( *state[ self.br_0_orientation ] )
-        br_1_transformation_matrix = self.br_1.build_transformation_matrix( *state[ self.br_1_orientation ] )
+        br_0_transformation_matrix = self.br_0.get_body_to_world_transform( *state[ self.br_0_orientation ] )
+        br_1_transformation_matrix = self.br_1.get_body_to_world_transform( *state[ self.br_1_orientation ] )
         perturbation_01_0 = br_0_transformation_matrix.T @ perturbation_01_0
         perturbation_01_1 = br_1_transformation_matrix.T @ perturbation_01_1
 
@@ -135,8 +135,8 @@ class ChainOf2( Dynamics ):
         # we dont consider system-external perturbation because they are applied in __call__
         null = zeros( (self.br_state_size // 2,) )
 
-        br_0_transformation_matrix = self.br_0.build_transformation_matrix( *state[ self.br_0_orientation ] )
-        br_1_transformation_matrix = self.br_1.build_transformation_matrix( *state[ self.br_1_orientation ] )
+        br_0_transformation_matrix = self.br_0.get_body_to_world_transform( *state[ self.br_0_orientation ] )
+        br_1_transformation_matrix = self.br_1.get_body_to_world_transform( *state[ self.br_1_orientation ] )
 
         # in robot frame
         br_0_acceleration = self.br_0( state[ self.br_0_state ], actuation[ self.br_0_actuation ], null )[ 6: ]

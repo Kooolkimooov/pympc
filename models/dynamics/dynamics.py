@@ -11,6 +11,8 @@ class Dynamics:
         evaluates the dynamics
     **compute_error**( *ndarray*, *ndarray* ) -> *ndarray*:
         computes the error between two trajectories according to the system definition
+    **get_body_to_world_transform**( *ndarray* ) -> *ndarray*:
+        computes the transformation matrix from body to world frame
 
     Properties
     ----------
@@ -80,6 +82,22 @@ class Dynamics:
         -------
         ndarray: 
             error between the two trajectories of shape (n, 1, state_size)
+        """
+        raise NotImplementedError
+
+    def get_body_to_world_transform( self, state: ndarray ) -> ndarray:
+        """
+        computes the transformation matrix from body to world frame
+
+        Parameters
+        ----------
+        state: ndarray
+            current state of the system of shape (state_size,)
+
+        Returns
+        -------
+        ndarray:
+            transformation matrix
         """
         raise NotImplementedError
 

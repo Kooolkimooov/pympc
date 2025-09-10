@@ -91,8 +91,8 @@ class ChainOf3WithFixedPoint:
         perturbation_01_1.resize( (Bluerov.actuation_size,), refcheck=False )
 
         # perturbation is in world frame, should be applied robot frame instead
-        br_0_transformation_matrix = self.br_0.build_transformation_matrix( *state[ self.br_0_orientation ] )
-        br_1_transformation_matrix = self.br_1.build_transformation_matrix( *state[ self.br_1_orientation ] )
+        br_0_transformation_matrix = self.br_0.get_body_to_world_transform( *state[ self.br_0_orientation ] )
+        br_1_transformation_matrix = self.br_1.get_body_to_world_transform( *state[ self.br_1_orientation ] )
         perturbation_01_0 = br_0_transformation_matrix.T @ perturbation_01_0
         perturbation_01_1 = br_1_transformation_matrix.T @ perturbation_01_1
 
@@ -145,8 +145,8 @@ class ChainOf3WithFixedPoint:
 
         null = zeros( (br_0.pose_size,) )
 
-        br_0_transformation_matrix = br_0.build_transformation_matrix( *br_0_orientation )
-        br_1_transformation_matrix = br_1.build_transformation_matrix( *br_1_orientation )
+        br_0_transformation_matrix = br_0.get_body_to_world_transform( *br_0_orientation )
+        br_1_transformation_matrix = br_1.get_body_to_world_transform( *br_1_orientation )
 
         # in robot frame
         br_0_acceleration = br_0( state[ br_0_state ], actuation[ br_0_actuation ], null )[ 6: ]

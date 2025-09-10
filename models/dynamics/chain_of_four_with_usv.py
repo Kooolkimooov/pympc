@@ -20,11 +20,19 @@ class ChainOf4WithUSV( Dynamics ):
     _body_rates = r_[ slice( 27, 30 ), slice( 33, 36 ), slice( 39, 42 ), slice( 45, 48 ) ]
 
     _linear_actuation = r_[
-        Bluerov().linear_actuation, Bluerov().linear_actuation + Bluerov().linear_actuation.shape[ 0 ] +
-                                    Bluerov().angular_actuation.shape[ 0 ] ]
+        Bluerov().linear_actuation,
+        Bluerov().linear_actuation + Bluerov().linear_actuation.shape[ 0 ] + Bluerov().angular_actuation.shape[ 0 ],
+        Bluerov().linear_actuation + 2 * Bluerov().linear_actuation.shape[ 0 ] + 2 * Bluerov().angular_actuation.shape[
+            0 ],
+        USV().linear_actuation + 3 * Bluerov().linear_actuation.shape[ 0 ] + 3 * Bluerov().angular_actuation.shape[ 0 ]
+    ]
     _angular_actuation = r_[
-        Bluerov().angular_actuation, Bluerov().angular_actuation + Bluerov().linear_actuation.shape[ 0 ] +
-                                     Bluerov().angular_actuation.shape[ 0 ] ]
+        Bluerov().angular_actuation,
+        Bluerov().angular_actuation + Bluerov().linear_actuation.shape[ 0 ] + Bluerov().angular_actuation.shape[ 0 ],
+        Bluerov().angular_actuation + 2 * Bluerov().linear_actuation.shape[ 0 ] + 2 * Bluerov().angular_actuation.shape[
+            0 ],
+        USV().angular_actuation + 3 * Bluerov().linear_actuation.shape[ 0 ] + 3 * Bluerov().angular_actuation.shape[ 0 ]
+    ]
 
     _br_state_size = Bluerov().state_size
     _br_actuation_size = Bluerov().actuation_size
@@ -99,13 +107,25 @@ class ChainOf4WithUSV( Dynamics ):
             get_cable_parameter_method,
             reference_frame
     ):
-        self.br_0 = Bluerov( water_surface_depth, water_current, reference_frame )
+        self.br_0 = Bluerov(
+                water_surface_depth=water_surface_depth,
+                water_current=water_current,
+                reference_frame=reference_frame
+        )
         self.c_01 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method, reference_frame )
-        self.br_1 = Bluerov( water_surface_depth, water_current, reference_frame )
+        self.br_1 = Bluerov(
+                water_surface_depth=water_surface_depth,
+                water_current=water_current,
+                reference_frame=reference_frame
+        )
         self.c_12 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method, reference_frame )
-        self.br_2 = Bluerov( water_surface_depth, water_current, reference_frame )
+        self.br_2 = Bluerov(
+                water_surface_depth=water_surface_depth,
+                water_current=water_current,
+                reference_frame=reference_frame
+        )
         self.c_23 = Catenary( cables_length, cables_linear_mass, get_cable_parameter_method, reference_frame )
-        self.br_3 = USV( water_surface_depth, reference_frame )
+        self.br_3 = USV( water_surface_depth=water_surface_depth, reference_frame=reference_frame )
 
         self.sf = seafloor
 
@@ -168,10 +188,10 @@ class ChainOf4WithUSV( Dynamics ):
         perturbation_23_3.resize( (self.br_state_size // 2,), refcheck=False )
 
         # perturbation is in world frame, should be applied robot frame instead
-        br_0_transformation_matrix = self.br_0.build_transformation_matrix( *state[ self.br_0_orientation ] )
-        br_1_transformation_matrix = self.br_1.build_transformation_matrix( *state[ self.br_1_orientation ] )
-        br_2_transformation_matrix = self.br_2.build_transformation_matrix( *state[ self.br_2_orientation ] )
-        br_3_transformation_matrix = self.br_3.build_transformation_matrix( *state[ self.br_3_orientation ] )
+        br_0_transformation_matrix = self.br_0.get_body_to_world_transform( state[ self.br_0_state ] )
+        br_1_transformation_matrix = self.br_1.get_body_to_world_transform( state[ self.br_1_state ] )
+        br_2_transformation_matrix = self.br_2.get_body_to_world_transform( state[ self.br_2_state ] )
+        br_3_transformation_matrix = self.br_3.get_body_to_world_transform( state[ self.br_3_state ] )
 
         perturbation_01_0 = br_0_transformation_matrix.T @ perturbation_01_0
         perturbation_01_1 = br_1_transformation_matrix.T @ perturbation_01_1
@@ -219,6 +239,24 @@ class ChainOf4WithUSV( Dynamics ):
         )
         return error
 
+    def get_body_to_world_transform( self, state: ndarray ) -> ndarray:
+        matrix = zeros( (self.state_size // 2, self.state_size // 2) )
+
+        matrix[ :, self.br_0_pose ][ self.br_0_pose ] = self.br_0.get_body_to_world_transform(
+                state[ self.br_0_state ]
+        )
+        matrix[ :, self.br_1_pose ][ self.br_1_pose ] = self.br_1.get_body_to_world_transform(
+                state[ self.br_1_state ]
+        )
+        matrix[ :, self.br_2_pose ][ self.br_2_pose ] = self.br_2.get_body_to_world_transform(
+                state[ self.br_2_state ]
+                )
+        matrix[ :, self.br_3_pose ][ self.br_3_pose ] = self.br_3.get_body_to_world_transform(
+                state[ self.br_3_state ]
+                )
+
+        return matrix
+
     def get_taunt_cable_perturbations(
             self,
             br_0: Bluerov,
@@ -234,8 +272,8 @@ class ChainOf4WithUSV( Dynamics ):
 
         null = zeros( (self.br_state_size // 2,) )
 
-        br_0_transformation_matrix = br_0.build_transformation_matrix( *br_0_state[ br_0.orientation ] )
-        br_1_transformation_matrix = br_1.build_transformation_matrix( *br_1_state[ br_1.orientation ] )
+        br_0_transformation_matrix = br_0.get_body_to_world_transform( *br_0_state[ br_0.orientation ] )
+        br_1_transformation_matrix = br_1.get_body_to_world_transform( *br_1_state[ br_1.orientation ] )
 
         # in robot frame
         br_0_acceleration = br_0( br_0_state, br_0_actuation, null )[ 6: ]
@@ -525,8 +563,8 @@ def chain_of_4_objective_mpc( self: MPC, prediction: ndarray, actuation: ndarray
 def chain_of_4_constraints_pp( self: PP, candidate: ndarray ) -> ndarray:
     chain: ChainOf4WithUSV = self.model.dynamics
 
-    candidate = candidate.reshape( self.result_shape )
-    prediction = candidate[ :, 0 ]
+    trajectory = self.get_trajectory( candidate )
+    prediction = trajectory[ :, 0 ]
 
     # 3 constraints on cables (distance of lowest point to seafloor)
     # 6 on inter robot_distance (3 horizontal, 2 3d)
@@ -590,11 +628,11 @@ def chain_of_4_constraints_pp( self: PP, candidate: ndarray ) -> ndarray:
     return constraints.flatten()
 
 
-def chain_of_4_objective_pp( self: PP, trajectory: ndarray ) -> float:
+def chain_of_4_objective_pp( self: PP, candidate: ndarray ) -> float:
     chain: ChainOf4WithUSV = self.model.dynamics
     desired_distance = chain.c_01.length / 2
 
-    trajectory = trajectory.reshape( self.result_shape )
+    trajectory = self.get_trajectory( candidate )
     speed = diff( trajectory, prepend=[ [ self.model.state[ :chain.state_size // 2 ] ] ], axis=0 ) / self.time_step
 
     prediction = concatenate( [ trajectory, speed ], axis=2 )
