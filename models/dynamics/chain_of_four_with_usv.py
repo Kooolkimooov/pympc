@@ -1,4 +1,4 @@
-from numpy import diff, dot, linspace, ndarray, r_, zeros
+from numpy import diff, dot, linspace, ndarray, r_, zeros, ix_
 from numpy.linalg import norm
 from numpy.ma.core import concatenate
 
@@ -242,16 +242,17 @@ class ChainOf4WithUSV( Dynamics ):
     def get_body_to_world_transform( self, state: ndarray ) -> ndarray:
         matrix = zeros( (self.state_size // 2, self.state_size // 2) )
 
-        matrix[ :, self.br_0_pose ][ self.br_0_pose ] = self.br_0.get_body_to_world_transform(
+        # Use proper 2D advanced indexing to avoid temporary copies
+        matrix[ ix_( self.br_0_pose, self.br_0_pose ) ] = self.br_0.get_body_to_world_transform(
                 state[ self.br_0_state ]
         )
-        matrix[ :, self.br_1_pose ][ self.br_1_pose ] = self.br_1.get_body_to_world_transform(
+        matrix[ ix_( self.br_1_pose, self.br_1_pose ) ] = self.br_1.get_body_to_world_transform(
                 state[ self.br_1_state ]
         )
-        matrix[ :, self.br_2_pose ][ self.br_2_pose ] = self.br_2.get_body_to_world_transform(
+        matrix[ ix_( self.br_2_pose, self.br_2_pose ) ] = self.br_2.get_body_to_world_transform(
                 state[ self.br_2_state ]
                 )
-        matrix[ :, self.br_3_pose ][ self.br_3_pose ] = self.br_3.get_body_to_world_transform(
+        matrix[ ix_( self.br_3_pose, self.br_3_pose ) ] = self.br_3.get_body_to_world_transform(
                 state[ self.br_3_state ]
                 )
 
@@ -272,8 +273,9 @@ class ChainOf4WithUSV( Dynamics ):
 
         null = zeros( (self.br_state_size // 2,) )
 
-        br_0_transformation_matrix = br_0.get_body_to_world_transform( *br_0_state[ br_0.orientation ] )
-        br_1_transformation_matrix = br_1.get_body_to_world_transform( *br_1_state[ br_1.orientation ] )
+        # Use full state to compute transform (consistent with other calls)
+        br_0_transformation_matrix = br_0.get_body_to_world_transform( br_0_state )
+        br_1_transformation_matrix = br_1.get_body_to_world_transform( br_1_state )
 
         # in robot frame
         br_0_acceleration = br_0( br_0_state, br_0_actuation, null )[ 6: ]
