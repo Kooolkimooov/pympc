@@ -18,6 +18,8 @@ class PP:
         target trajectory
     model: Model
         model of the system
+    optimize_on: str
+        whether to optimize on the trajectory or its derivative; must be one of 'trajectory', 'trajectory_derivative'
     objective: callable
         objective function, must have the following signature: f(trajectory)
     guess_from_last_solution: bool
@@ -97,11 +99,14 @@ class PP:
         shape of the result array; (horizon, 1, actuation_size)
     """
 
+    OPTIMIZE_ON = [ 'trajectory_derivative', 'trajectory' ]
+
     def __init__(
             self,
             horizon: int,
             target_trajectory: ndarray,
             model: Model,
+            optimize_on: str = 'trajectory',
             objective: callable = None,
             guess_from_last_solution: bool = True,
             tolerance: float = 1e-6,
@@ -115,6 +120,15 @@ class PP:
             verbose: bool = False
     ):
         self.model = model
+
+        if optimize_on == 'trajectory_derivative':
+            self.get_trajectory = self._get_trajectory_from_derivative
+            self.compute_result = self._compute_result_from_derivative
+        elif optimize_on == 'trajectory':
+            self.get_trajectory = self._get_trajectory_from_actual
+            self.compute_result = self._compute_result_from_actual
+        else:
+            raise ValueError( f'optimize_on must be one of {self.OPTIMIZE_ON}' )
 
         self.horizon = horizon
         self.target_trajectory = target_trajectory
@@ -211,10 +225,10 @@ class PP:
             cost of the candidate for the optimization
         """
 
-        candidate = candidate.reshape( self.result_shape )
+        trajectory = self.get_trajectory( candidate )
 
         error = self.model.dynamics.compute_error(
-                candidate, self.target_trajectory[ :self.horizon ]
+                trajectory, self.target_trajectory[ :self.horizon ]
         )
 
         cost = 0.
@@ -229,18 +243,55 @@ class PP:
         cost += self.final_weight * (error[ -1 ] @ self.pose_weight_matrix[ -1 ] @ error[ -1 ].T).sum()
 
         if self.record:
-            self.predicted_trajectories.append( candidate )
+            self.predicted_trajectories.append( trajectory )
 
         if cost < self.best_cost:
             self.best_candidate = candidate.copy()
 
         return cost
 
+    def get_trajectory( self, candidate: ndarray ) -> tuple:
+        """
+        computes an actionable actuation over the horizon from the candidate actuation
+
+        Parameters
+        ----------
+        candidate : ndarray
+            proposed solution for the optimization problem; shape = (horizon, 1, actuation_size)
+
+        Returns
+        -------
+        actuation: ndarray
+            proposed actuation over the horizon; shape = (horizon, 1, actuation_size)
+        actuation_derivatives: ndarray
+            proposed actuation derivative over the horizon; shape = (horizon, 1, actuation_size)
+        """
+        raise NotImplementedError( 'predict method should have been implemented in __init__' )
+
     def compute_result( self ):
         """
         computes the best actuation from scipy.optimize raw result and store it in self.result
         """
-        self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0, : ]
+        raise NotImplementedError( 'predict method should have been implemented in __init__' )
 
     def get_objective( self ) -> float:
         return self.objective( self.raw_result.x.reshape( self.result_shape ) )
+
+    def _compute_result_from_actual( self ):
+        self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0, : ]
+
+    def _compute_result_from_derivative( self ):
+        self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0, : ] * self.time_step + self.model.state[
+            :self.model.dynamics.state_size // 2 ]
+
+    def _get_trajectory_from_derivative( self, candidate: ndarray ) -> tuple:
+        trajectory_derivatives = candidate.reshape( self.result_shape )
+        trajectory = trajectory_derivatives.cumsum( axis=0 ) * self.time_step + self.model.state[
+            :self.model.dynamics.state_size // 2 ]
+
+        return trajectory
+
+    def _get_trajectory_from_actual( self, candidate: ndarray ) -> tuple:
+        trajectory = candidate.reshape( self.result_shape )
+
+        return trajectory
