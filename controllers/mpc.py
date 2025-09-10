@@ -315,6 +315,7 @@ class MPC:
 
         if cost < self.best_cost:
             self.best_candidate = candidate.copy()
+            self.best_cost = cost
 
         return cost
 
