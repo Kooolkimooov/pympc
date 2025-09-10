@@ -141,21 +141,23 @@ class PID:
 
         self.last_error = error
 
+        world_to_body = self.model.dynamics.get_body_to_world_transform( self.model.state ).T
+
         actuation = zeros( self.result_shape )
-        actuation += self.proportional @ error.flatten()
-        actuation += self.integral @ self.integral_error.flatten()
-        actuation += self.derivative @ derivative_error.flatten()
+        actuation += self.proportional @ world_to_body @ error.flatten()
+        actuation += self.integral @ world_to_body @ self.integral_error.flatten()
+        actuation += self.derivative @ world_to_body @ derivative_error.flatten()
         actuation += self.offset
 
         if self.record:
             self.compute_times.append( perf_counter() - ti )
 
         if self.verbose:
-            print( f'Error: {error.flatten()}' )
-            print( f'P: {(self.proportional @ error.flatten())}' )
-            print( f'I: {(self.integral @ self.integral_error.flatten())}' )
-            print( f'D: {(self.derivative @ derivative_error.flatten())}' )
+            print( f'Error    : {error.flatten()}' )
+            print( f'P        : {(self.proportional @ error.flatten())}' )
+            print( f'I        : {(self.integral @ self.integral_error.flatten())}' )
+            print( f'D        : {(self.derivative @ derivative_error.flatten())}' )
             print( f'Actuation: {actuation}' )
-            print( f'Time: {self.compute_times}' )
+            print( f'Time     : {self.compute_times}' )
 
         return actuation
