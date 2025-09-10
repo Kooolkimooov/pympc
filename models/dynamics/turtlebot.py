@@ -55,8 +55,8 @@ class Turtlebot( Dynamics ):
 
     def compute_error( self, actual: ndarray, target: ndarray ) -> ndarray:
         error = zeros( actual.shape )
-        error[ :, :, :2 ] = actual[ :, :, :2 ] - target[ :, :, :2 ]
-        error[ :, :, 2 ] = (actual[ :, :, 2 ] - target[ :, :, 2 ]) % pi
+        error[ :, :, :2 ] = target[ :, :, :2 ] - actual[ :, :, :2 ]
+        error[ :, :, 2 ] = (target[ :, :, 2 ] - actual[ :, :, 2 ]) % ( 2 * pi )
 
         return error
 

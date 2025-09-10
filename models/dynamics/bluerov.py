@@ -129,8 +129,8 @@ class Bluerov( Dynamics ):
         return xdot
 
     def compute_error( self, actual: ndarray, target: ndarray ) -> ndarray:
-        error = actual - target
-        error[ :, :, self.orientation ] %= pi
+        error = target - actual
+        error[ :, :, self.orientation ] %= 2 * pi
         return error
 
     def get_body_to_world_transform( self, state: ndarray ) -> ndarray:
