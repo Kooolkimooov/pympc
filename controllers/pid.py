@@ -1,6 +1,6 @@
 from time import perf_counter
 
-from numpy import abs, any, eye, ndarray, zeros
+from numpy import abs, any, eye, ndarray, r_, zeros
 
 from pympc.models.model import Model
 
@@ -65,6 +65,7 @@ class PID:
             integral: ndarray = None,
             derivative: ndarray = None,
             offset: ndarray = None,
+            acceleration_compensation=None,
             use_anti_windup: bool = True,
             anti_windup_limit: float = 1e1,
             record: bool = False,
@@ -75,6 +76,8 @@ class PID:
         self.result_shape = (self.model.dynamics.actuation_size,)
 
         self.target = target
+
+        self.previous_error = None
 
         self.error = zeros( (self.model.dynamics.state_size // 2,) )
         self.integral_error = zeros( (self.model.dynamics.state_size // 2,) )
@@ -100,6 +103,13 @@ class PID:
         else:
             assert derivative.shape == self.gain_shape, f'derivative gain must be of shape {self.gain_shape}'
             self.derivative = derivative
+
+        if acceleration_compensation is None:
+            self.acceleration_compensation = zeros( self.gain_shape )
+        else:
+            assert acceleration_compensation.shape == self.gain_shape, (
+                    f'acceleration_compensation gain must be of shape {self.gain_shape}')
+            self.acceleration_compensation = acceleration_compensation
 
         if offset is None:
             self.offset = zeros( (self.model.dynamics.actuation_size,) )
@@ -136,6 +146,12 @@ class PID:
 
         body_to_world = self.model.dynamics.get_body_to_world_transform( self.model.state )
 
+        state_derivative = self.model.dynamics(
+                self.model.state,
+                self.model.actuation,
+                zeros( self.model.dynamics.state_size // 2 )
+        )
+
         self.error = self.model.dynamics.compute_error(
                 self.model.state[ :self.model.dynamics.state_size // 2 ].reshape(
                         (1, 1, self.model.dynamics.state_size // 2)
@@ -147,25 +163,30 @@ class PID:
             self.integral_error.fill( 0.0 )
         self.integral_error += self.error * self.model.time_step
 
-        self.derivative_error = zeros( (self.model.dynamics.state_size // 2, ) )
+        if not self.previous_error is None:
+            self.derivative_error = (self.error - self.previous_error) * self.model.time_step
 
-        self.derivative_error = - body_to_world @ self.model.state[ self.model.dynamics.state_size // 2: ]
+        self.previous_error = self.error.copy()
 
         actuation = zeros( self.result_shape )
-        actuation += self.proportional @ body_to_world.T @ self.error.flatten()
-        actuation += self.integral @ body_to_world.T @ self.integral_error.flatten()
-        actuation += self.derivative @ body_to_world.T @ self.derivative_error.flatten()
+        actuation += self.proportional @ body_to_world.T @ self.error
+        actuation += self.integral @ body_to_world.T @ self.integral_error
+        actuation += self.derivative @ body_to_world.T @ self.derivative_error
         actuation += self.offset
+        actuation -= self.acceleration_compensation @ state_derivative[
+            r_[ self.model.dynamics.velocity, self.model.dynamics.body_rates ] ]
 
         if self.record:
             self.compute_times.append( perf_counter() - ti )
 
         if self.verbose:
-            print( f'Error    : {self.error.flatten()}' )
-            print( f'P        : {self.proportional @ body_to_world.T @ self.error.flatten()}' )
-            print( f'I        : {self.integral @ body_to_world.T @ self.integral_error.flatten()}' )
-            print( f'D        : {self.derivative @ body_to_world.T @ self.derivative_error.flatten()}' )
-            print( f'Actuation: {actuation}' )
-            print( f'Time     : {self.compute_times}' )
+            print( f'Error           : {self.error}' )
+            print( f'Integral Error  : {self.integral_error}' )
+            print( f'Derivative Error: {self.derivative_error}' )
+            print( f'P               : {self.proportional @ body_to_world.T @ self.error}' )
+            print( f'I               : {self.integral @ body_to_world.T @ self.integral_error}' )
+            print( f'D               : {self.derivative @ body_to_world.T @ self.derivative_error}' )
+            print( f'Actuation       : {actuation}' )
+            print( f'Time            : {self.compute_times}' )
 
         return actuation
