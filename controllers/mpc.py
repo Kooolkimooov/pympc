@@ -20,6 +20,10 @@ class MPC:
         prediction horizon
     target_trajectory: ndarray
         target trajectory
+    model_type: str
+        type of model to use for prediction, either 'linear' or 'nonlinear'
+    optimize_on: str
+        whether to optimize on 'actuation_derivative' or 'actuation'
     objective: callable
         objective function, must have the following signature: f(trajectory, actuation)
     time_steps_per_actuation: int
