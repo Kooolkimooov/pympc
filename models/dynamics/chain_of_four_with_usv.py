@@ -641,10 +641,10 @@ def chain_of_4_objective_pp( self: PP, candidate: ndarray ) -> float:
 
     objective = 0.
 
-    # objective += pow( norm( prediction[ :, 0, chain.br_0_velocity ], axis = 1 ).sum(), 2 )
-    # objective += pow( norm( prediction[ :, 0, chain.br_1_velocity ], axis=1 ).sum(), 2 )
-    # objective += pow( norm( prediction[ :, 0, chain.br_2_velocity ], axis=1 ).sum(), 2 )
-    # objective += pow( norm( prediction[ :, 0, chain.br_3_velocity ], axis=1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_0_velocity ], axis = 1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_1_velocity ], axis=1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_2_velocity ], axis=1 ).sum(), 2 )
+    objective += pow( norm( prediction[ :, 0, chain.br_3_velocity ], axis=1 ).sum(), 2 )
 
     objective += abs(
             norm(
