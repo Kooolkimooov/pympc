@@ -123,10 +123,8 @@ class PP:
 
         if optimize_on == 'trajectory_derivative':
             self.get_trajectory = self._get_trajectory_from_derivative
-            self.compute_result = self._compute_result_from_derivative
         elif optimize_on == 'trajectory':
             self.get_trajectory = self._get_trajectory_from_actual
-            self.compute_result = self._compute_result_from_actual
         else:
             raise ValueError( f'optimize_on must be one of {self.OPTIMIZE_ON}' )
 
@@ -273,26 +271,22 @@ class PP:
         """
         computes the best actuation from scipy.optimize raw result and store it in self.result
         """
-        raise NotImplementedError( 'predict method should have been implemented in __init__' )
+        self.result = self.get_trajectory( self.raw_result.x )[ 0, 0, : ]
 
     def get_objective( self ) -> float:
         return self.objective( self.raw_result.x.reshape( self.result_shape ) )
 
-    def _compute_result_from_actual( self ):
-        self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0, : ]
-
-    def _compute_result_from_derivative( self ):
-        self.result = self.raw_result.x.reshape( self.result_shape )[ 0, 0, : ] * self.time_step + self.model.state[
-            :self.model.dynamics.state_size // 2 ]
-
-    def _get_trajectory_from_derivative( self, candidate: ndarray ) -> tuple:
-        trajectory_derivatives = candidate.reshape( self.result_shape )
-        trajectory = trajectory_derivatives.cumsum( axis=0 ) * self.time_step + self.model.state[
+    def _get_trajectory_from_derivative( self, candidate: ndarray ) -> ndarray:
+        trajectory_derivatives_body = candidate.reshape( self.result_shape )
+        transform = self.model.dynamics.get_body_to_world_transform( self.model.state ).T
+        # transform = transform.reshape(
+        #         (1, self.model.dynamics.state_size // 2, self.model.dynamics.state_size // 2)
+        #         ).repeat( self.horizon, axis=0 )
+        trajectory_derivatives_world = trajectory_derivatives_body @ transform
+        trajectory = trajectory_derivatives_world.cumsum( axis=0 ) * self.time_step + self.model.state[
             :self.model.dynamics.state_size // 2 ]
 
         return trajectory
 
-    def _get_trajectory_from_actual( self, candidate: ndarray ) -> tuple:
-        trajectory = candidate.reshape( self.result_shape )
-
-        return trajectory
+    def _get_trajectory_from_actual( self, candidate: ndarray ) -> ndarray:
+        return candidate.reshape( self.result_shape )
