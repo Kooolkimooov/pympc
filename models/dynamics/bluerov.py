@@ -1,4 +1,4 @@
-from numpy import array, concatenate, cos, cross, diag, exp, eye, ndarray, pi, r_, sin, tan, zeros
+from numpy import arctan2, array, concatenate, cos, cross, diag, exp, eye, ndarray, r_, sin, tan, zeros
 from numpy.linalg import inv
 
 from pympc.models.dynamics.dynamics import Dynamics
@@ -130,7 +130,8 @@ class Bluerov( Dynamics ):
 
     def compute_error( self, actual: ndarray, target: ndarray ) -> ndarray:
         error = target - actual
-        error[ :, :, self.orientation ] %= 2 * pi
+        orientation_error = error[ ..., self.orientation ]
+        error[ ..., self.orientation ] = arctan2( sin( orientation_error ), cos( orientation_error ) )
         return error
 
     def get_body_to_world_transform( self, state: ndarray ) -> ndarray:
