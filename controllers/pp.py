@@ -1,6 +1,6 @@
 from time import perf_counter
 
-from numpy import eye, inf, ndarray, zeros
+from numpy import eye, inf, ndarray, pow, zeros
 from scipy.optimize import OptimizeResult, minimize
 
 from pympc.models.model import Model
@@ -18,8 +18,6 @@ class PP:
         target trajectory
     model: Model
         model of the system
-    optimize_on: str
-        whether to optimize on the trajectory or its derivative; must be one of 'trajectory', 'trajectory_derivative'
     objective: callable
         objective function, must have the following signature: f(trajectory)
     guess_from_last_solution: bool
@@ -38,6 +36,19 @@ class PP:
         weight for the objective function
     final_weight: float
         weight for the final pose error
+    replan_method: str
+        method to use for replanning the trajectory, must be one of the following:
+        'never': never replan the trajectory
+        'on_max_error': replan the trajectory if the error between the current state and the target trajectory
+        exceeds max_replan_error
+        'after_n_steps': replan the trajectory after steps_before_replan steps
+        'error_and_steps': replan the trajectory if the error between the current state and the target trajectory
+        exceeds max_replan_error or after steps_before_replan steps
+        'always': replan the trajectory at each step
+    max_replan_error: float
+        maximum error between the current state and the target trajectory to replan the trajectory
+    steps_before_replan: int
+        number of steps before replanning the trajectory
     record: bool
         whether to record the computation times, predicted trajectories and candidate actuations
     verbose: bool
@@ -51,6 +62,12 @@ class PP:
         cost function for the optimization
     **get_objective**():
         computes the objective function value for the current state of the model
+    **get_trajectory**( *ndarray* ):
+        computes an actionable trajectory over the horizon from the candidate
+    **compute_result**():
+        computes the best actuation from raw result and store it in self.result
+    **should_replan**():
+        checks if the trajectory should be replanned
 
     Properties
     ----------
@@ -91,6 +108,12 @@ class PP:
         best cost found during the optimization
     **best_candidate**: *ndarray*:
         best candidate found during the optimization; returned if optimization fails
+    **max_replan_error**: **float**:
+        maximum error between the current state and the target trajectory to replan the trajectory
+    **steps_before_replan**: **int**:
+        number of steps before replanning the trajectory
+    **steps_since_replan**: **int**:
+        number of steps since the last replanning
     **result**: *ndarray*:
         best actuation found during the optimization
     **raw_result**: *OptimizeResult*:
@@ -99,14 +122,13 @@ class PP:
         shape of the result array; (horizon, 1, actuation_size)
     """
 
-    OPTIMIZE_ON = [ 'trajectory_derivative', 'trajectory' ]
+    REPLAN_METHOD = [ 'never', 'on_max_error', 'after_n_steps', 'error_and_steps', 'always' ]
 
     def __init__(
             self,
             horizon: int,
             target_trajectory: ndarray,
             model: Model,
-            optimize_on: str = 'trajectory',
             objective: callable = None,
             guess_from_last_solution: bool = True,
             tolerance: float = 1e-6,
@@ -116,17 +138,26 @@ class PP:
             pose_weight_matrix: ndarray = None,
             objective_weight: float = 0.,
             final_weight: float = 0.,
+            replan_method: str = 'never',
+            max_replan_error: float = 1.0,
+            steps_before_replan: int = 10,
             record: bool = False,
             verbose: bool = False
     ):
-        self.model = model
-
-        if optimize_on == 'trajectory_derivative':
-            self.get_trajectory = self._get_trajectory_from_derivative
-        elif optimize_on == 'trajectory':
-            self.get_trajectory = self._get_trajectory_from_actual
+        if replan_method == 'never':
+            self.should_replan = self._should_replan_never
+        elif replan_method == 'on_max_error':
+            self.should_replan = self._should_replan_on_max_error
+        elif replan_method == 'after_n_steps':
+            self.should_replan = self._should_replan_after_n_steps
+        elif replan_method == 'error_and_steps':
+            self.should_replan = self._should_replan_error_and_steps
+        elif replan_method == 'always':
+            self.should_replan = self._should_replan_always
         else:
-            raise ValueError( f'optimize_on must be one of {self.OPTIMIZE_ON}' )
+            raise ValueError( f'replan_method must be one of {self.REPLAN_METHOD}' )
+
+        self.model = model
 
         self.horizon = horizon
         self.target_trajectory = target_trajectory
@@ -159,6 +190,11 @@ class PP:
         self.objective_weight = objective_weight
         self.final_weight = final_weight
 
+        self.max_replan_error = max_replan_error
+        self.steps_before_replan = steps_before_replan
+        self.steps_since_replan = 0
+        self.is_first_plan = True
+
         self.best_cost = inf
         self.best_candidate = zeros( self.result_shape )
 
@@ -184,16 +220,22 @@ class PP:
             self.predicted_trajectories.clear()
             ti = perf_counter()
 
-        self.raw_result = minimize(
-                fun=self.cost,
-                x0=self.raw_result.x.flatten(),
-                tol=self.tolerance,
-                bounds=self.bounds,
-                constraints=self.constraints,
-                options={
-                        'maxiter': self.max_number_of_iteration, 'disp': self.verbose
-                }
-        )
+        if self.should_replan():
+            self.raw_result = minimize(
+                    fun=self.cost,
+                    x0=self.raw_result.x.flatten(),
+                    tol=self.tolerance,
+                    bounds=self.bounds,
+                    constraints=self.constraints,
+                    options={
+                            'maxiter': self.max_number_of_iteration, 'disp': self.verbose
+                    }
+            )
+        else:
+            temp = zeros( self.result_shape )
+            temp[ :-1 ] = self.raw_result.x.reshape( self.result_shape )[ 1: ]
+            temp[ -1 ] = temp[ -2 ]
+            self.raw_result.x = temp
 
         if self.record:
             self.compute_times.append( perf_counter() - ti )
@@ -249,7 +291,7 @@ class PP:
 
         return cost
 
-    def get_trajectory( self, candidate: ndarray ) -> tuple:
+    def get_trajectory( self, candidate: ndarray ) -> ndarray:
         """
         computes an actionable actuation over the horizon from the candidate actuation
 
@@ -265,7 +307,13 @@ class PP:
         actuation_derivatives: ndarray
             proposed actuation derivative over the horizon; shape = (horizon, 1, actuation_size)
         """
-        raise NotImplementedError( 'predict method should have been implemented in __init__' )
+        trajectory_derivatives_body = candidate.reshape( self.result_shape )
+        transform = self.model.dynamics.get_body_to_world_transform( self.model.state ).T
+        trajectory_derivatives_world = trajectory_derivatives_body @ transform
+        trajectory = trajectory_derivatives_world.cumsum( axis=0 ) * self.time_step + self.model.state[
+            :self.model.dynamics.state_size // 2 ]
+
+        return trajectory
 
     def compute_result( self ):
         """
@@ -276,17 +324,34 @@ class PP:
     def get_objective( self ) -> float:
         return self.objective( self.raw_result.x.reshape( self.result_shape ) )
 
-    def _get_trajectory_from_derivative( self, candidate: ndarray ) -> ndarray:
-        trajectory_derivatives_body = candidate.reshape( self.result_shape )
-        transform = self.model.dynamics.get_body_to_world_transform( self.model.state ).T
-        # transform = transform.reshape(
-        #         (1, self.model.dynamics.state_size // 2, self.model.dynamics.state_size // 2)
-        #         ).repeat( self.horizon, axis=0 )
-        trajectory_derivatives_world = trajectory_derivatives_body @ transform
-        trajectory = trajectory_derivatives_world.cumsum( axis=0 ) * self.time_step + self.model.state[
-            :self.model.dynamics.state_size // 2 ]
+    def should_replan( self ) -> bool:
+        raise NotImplementedError
 
-        return trajectory
+    def _should_replan_never( self ) -> bool:
+        if self.is_first_plan:
+            self.is_first_plan = False
+            return True
+        return False
 
-    def _get_trajectory_from_actual( self, candidate: ndarray ) -> ndarray:
-        return candidate.reshape( self.result_shape )
+    def _should_replan_on_max_error( self ) -> bool:
+        error = self.model.dynamics.compute_error(
+                self.model.state[ :self.model.dynamics.state_size // 2 ].reshape(
+                        (1, 1, self.model.dynamics.state_size // 2)
+                ),
+                self.target_trajectory[ 0 ].reshape( (1, 1, self.model.dynamics.state_size // 2) )
+        )
+
+        return pow( error, 2 ).sum() > pow( self.max_replan_error, 2 )
+
+    def _should_replan_after_n_steps( self ) -> bool:
+        self.steps_since_replan += 1
+        if self.steps_since_replan >= self.steps_before_replan:
+            self.steps_since_replan = 0
+            return True
+        return False
+
+    def _should_replan_error_and_steps( self ) -> bool:
+        return self._should_replan_on_max_error() or self._should_replan_after_n_steps()
+
+    def _should_replan_always( self ) -> bool:
+        return True
