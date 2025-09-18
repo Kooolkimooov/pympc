@@ -639,24 +639,27 @@ def chain_of_4_objective_pp( self: PP, candidate: ndarray ) -> float:
 
     prediction = concatenate( [ trajectory, speed ], axis=2 )
 
+    speed_factor = 0.1
+    dist_factor = 10.0
+
     objective = 0.
 
-    objective += pow( norm( prediction[ :, 0, chain.br_0_velocity ], axis = 1 ).sum(), 2 )
-    objective += pow( norm( prediction[ :, 0, chain.br_1_velocity ], axis=1 ).sum(), 2 )
-    objective += pow( norm( prediction[ :, 0, chain.br_2_velocity ], axis=1 ).sum(), 2 )
-    objective += pow( norm( prediction[ :, 0, chain.br_3_velocity ], axis=1 ).sum(), 2 )
+    objective += speed_factor * pow( norm( prediction[ :, 0, chain.br_0_velocity ], axis = 1 ).sum(), 2 )
+    objective += speed_factor * pow( norm( prediction[ :, 0, chain.br_1_velocity ], axis=1 ).sum(), 2 )
+    objective += speed_factor * pow( norm( prediction[ :, 0, chain.br_2_velocity ], axis=1 ).sum(), 2 )
+    objective += speed_factor * pow( norm( prediction[ :, 0, chain.br_3_velocity ], axis=1 ).sum(), 2 )
 
-    objective += abs(
+    objective += dist_factor * abs(
             norm(
                     prediction[ :, 0, chain.br_0_position ] - prediction[ :, 0, chain.br_1_position ], axis=1
             ) - desired_distance
     ).sum()
-    objective += abs(
+    objective += dist_factor * abs(
             norm(
                     prediction[ :, 0, chain.br_1_position ] - prediction[ :, 0, chain.br_2_position ], axis=1
             ) - desired_distance
     ).sum()
-    objective += abs(
+    objective += dist_factor * abs(
             norm(
                     prediction[ :, 0, chain.br_2_position ] - prediction[ :, 0, chain.br_3_position ], axis=1
             ) - desired_distance
