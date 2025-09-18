@@ -203,7 +203,7 @@ def print_dict( d: dict, max_list_size: int = 10, prefix: str = '' ):
         print( prefix + k, type( v ), ':', v, flush=True )
 
 
-def compare_dict( d0: dict, d1: dict, max_list_size: int = 10, prefix: str = '', only_diff=False ):
+def compare_dict( d0: dict, d1: dict, max_list_size: int = 10, prefix: str = '', only_diff=False, depth=-1 ):
     keys = set( list( d0.keys() ) + list( d1.keys() ) )
 
     for k in keys:
@@ -234,21 +234,29 @@ def compare_dict( d0: dict, d1: dict, max_list_size: int = 10, prefix: str = '',
 
         if isinstance( v, dict ):
             print( prefix + color_prefix + k, type( v ), color_suffix + ':', flush=True )
-            compare_dict(
-                    d0=v0, d1=v1, max_list_size=max_list_size, prefix=prefix + '\t', only_diff=only_diff
-            )
+            if depth != 0:
+                compare_dict(
+                        d0=v0,
+                        d1=v1,
+                        max_list_size=max_list_size,
+                        prefix=prefix + '\t',
+                        only_diff=only_diff,
+                        depth=depth - 1
+                )
             continue
 
         if isinstance( v, list ):
             if len( v ) > 0 and isinstance( v[ 0 ], dict ):
                 print( prefix + color_prefix + k, type( v ), color_suffix + ':', flush=True )
-                compare_dict(
-                        d0={ str( i ): e for i, e in enumerate( v0 ) },
-                        d1={ str( i ): e for i, e in enumerate( v1 ) },
-                        max_list_size=max_list_size,
-                        prefix=prefix + '\t',
-                        only_diff=only_diff
-                )
+                if depth != 0:
+                    compare_dict(
+                            d0={ str( i ): e for i, e in enumerate( v0 ) },
+                            d1={ str( i ): e for i, e in enumerate( v1 ) },
+                            max_list_size=max_list_size,
+                            prefix=prefix + '\t',
+                            only_diff=only_diff,
+                            depth = depth - 1
+                    )
                 continue
 
             l = array( v ).shape
