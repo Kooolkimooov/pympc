@@ -122,7 +122,7 @@ class PP:
         shape of the result array; (horizon, 1, actuation_size)
     """
 
-    REPLAN_METHOD = [ 'never', 'on_max_error', 'after_n_steps', 'error_and_steps', 'always' ]
+    REPLAN_METHOD = [ 'never', 'at_end_of_horizon', 'on_max_error', 'after_n_steps', 'on_error_and_steps', 'always' ]
 
     def __init__(
             self,
@@ -140,18 +140,21 @@ class PP:
             final_weight: float = 0.,
             replan_method: str = 'never',
             max_replan_error: float = 1.0,
-            steps_before_replan: int = 10,
+            steps_before_replan: int = 1,
             record: bool = False,
             verbose: bool = False
     ):
+
         if replan_method == 'never':
             self.should_replan = self._should_replan_never
+        if replan_method == 'at_end_of_horizon':
+            self.should_replan = self._should_replan_at_end_of_horizon
         elif replan_method == 'on_max_error':
             self.should_replan = self._should_replan_on_max_error
         elif replan_method == 'after_n_steps':
             self.should_replan = self._should_replan_after_n_steps
-        elif replan_method == 'error_and_steps':
-            self.should_replan = self._should_replan_error_and_steps
+        elif replan_method == 'on_error_and_steps':
+            self.should_replan = self._should_replan_on_error_and_steps
         elif replan_method == 'always':
             self.should_replan = self._should_replan_always
         else:
@@ -175,7 +178,7 @@ class PP:
                 self.horizon, 1, self.model.dynamics.state_size // 2
         )
 
-        self.raw_result = OptimizeResult( x=zeros( self.result_shape, ) )
+        self.raw_result = OptimizeResult( x=zeros( self.result_shape, ), success=False )
         self.result = zeros( (self.model.dynamics.state_size // 2) )
 
         self.pose_weight_matrix: ndarray = zeros(
@@ -217,10 +220,14 @@ class PP:
         """
 
         if self.record:
-            self.predicted_trajectories.clear()
             ti = perf_counter()
 
-        if self.should_replan():
+        if not self.raw_result.success or self.should_replan():
+            if self.verbose: print( 'planning' )
+
+            self.predicted_trajectories.clear()
+            self.steps_since_replan = 0
+
             self.raw_result = minimize(
                     fun=self.cost,
                     x0=self.raw_result.x.flatten(),
@@ -231,7 +238,11 @@ class PP:
                             'maxiter': self.max_number_of_iteration, 'disp': self.verbose
                     }
             )
+            if not self.raw_result.success and self.best_cost < inf:
+                self.raw_result.x = self.best_candidate
+                self.best_cost = inf
         else:
+            if self.verbose: print( 'using previously planned trajectory' )
             temp = zeros( self.result_shape )
             temp[ :-1 ] = self.raw_result.x.reshape( self.result_shape )[ 1: ]
             temp[ -1 ] = temp[ -2 ]
@@ -240,12 +251,7 @@ class PP:
         if self.record:
             self.compute_times.append( perf_counter() - ti )
 
-        if self.raw_result.success:
-            self.compute_result()
-        elif self.best_cost < inf:
-            self.raw_result.x = self.best_candidate
-            self.best_cost = inf
-            self.compute_result()
+        self.compute_result()
 
         return self.result
 
@@ -328,29 +334,45 @@ class PP:
         raise NotImplementedError
 
     def _should_replan_never( self ) -> bool:
+        self.steps_since_replan += 1
+
         if self.is_first_plan:
             self.is_first_plan = False
             return True
+
+        return False
+
+    def _should_replan_at_end_of_horizon( self ) -> bool:
+        self.steps_since_replan += 1
+
+        if self.is_first_plan or self.steps_since_replan >= self.horizon:
+            self.is_first_plan = False
+            return True
+
         return False
 
     def _should_replan_on_max_error( self ) -> bool:
+        self.steps_since_replan += 1
+
         error = self.model.dynamics.compute_error(
                 self.model.state[ :self.model.dynamics.state_size // 2 ].reshape(
                         (1, 1, self.model.dynamics.state_size // 2)
                 ),
-                self.target_trajectory[ 0 ].reshape( (1, 1, self.model.dynamics.state_size // 2) )
+                self.result.reshape( (1, 1, self.model.dynamics.state_size // 2) )
         )
 
         return pow( error, 2 ).sum() > pow( self.max_replan_error, 2 )
 
     def _should_replan_after_n_steps( self ) -> bool:
         self.steps_since_replan += 1
+
         if self.steps_since_replan >= self.steps_before_replan:
-            self.steps_since_replan = 0
             return True
+
         return False
 
-    def _should_replan_error_and_steps( self ) -> bool:
+    def _should_replan_on_error_and_steps( self ) -> bool:
+        self.steps_since_replan -= 1 # compensate double count
         return self._should_replan_on_max_error() or self._should_replan_after_n_steps()
 
     def _should_replan_always( self ) -> bool:
