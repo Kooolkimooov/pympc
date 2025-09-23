@@ -203,7 +203,7 @@ class Catenary:
         two_D_plus_dD = norm( p1[ :2 ] - p0[ :2 ] )
 
         if norm( p1 - p0 ) > 0.99 * self.length or any( isnan( p0 ) ) or any( isnan( p1 ) ):
-            return None, None, dH, None, None
+            return None, 0.0, dH, 0.0, two_D_plus_dD
         elif two_D_plus_dD < .01 * self.length:
             return None, (self.length - dH) / 2, dH, two_D_plus_dD / 2, 0.
 
