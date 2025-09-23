@@ -73,10 +73,9 @@ class Model:
         )
 
         self.record = record
-        if self.record:
-            self.previous_states = [ self.state.copy() ]
-            self.previous_actuations = [ self.actuation.copy() ]
-            self.previous_perturbations = [ self.perturbation.copy() ]
+        self.previous_states = [ self.state.copy() ]
+        self.previous_actuations = [ self.actuation.copy() ]
+        self.previous_perturbations = [ self.perturbation.copy() ]
 
     def step( self ):
         """

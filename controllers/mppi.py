@@ -132,10 +132,9 @@ class MPPI( MPC ):
         self.best_cost = -inf
 
         self.record = record
-        if self.record:
-            self.predicted_trajectories = [ ]
-            self.candidate_actuations = [ ]
-            self.compute_times = [ ]
+        self.predicted_trajectories = [ ]
+        self.candidate_actuations = [ ]
+        self.compute_times = [ ]
 
         self.verbose = verbose
 
