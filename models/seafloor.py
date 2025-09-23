@@ -1,3 +1,5 @@
+#%%
+
 from inspect import signature
 
 from numpy import asarray, exp, ndarray, sin
@@ -11,6 +13,16 @@ def seafloor_function_0( x, y ):
     z += .5 * sin( x / 3 )
     # peak at (-3, 0)
     z -= 2.5 * exp( -8 * (pow( (x - (-3)), 2 ) + pow( (y - 0), 2 )) )
+    return z
+
+def seafloor_function_1( x, y ):
+    x = asarray( x )
+    y = asarray( y )
+    z = -4.5
+    z -= 1. * sin( y / 4 )
+    z -= .5 * sin( x / 3 )
+    # peak at (-3, 0)
+    z += 2.5 * exp( -8 * (pow( (x - (-3)), 2 ) + pow( (y - 0), 2 )) )
     return z
 
 
@@ -98,3 +110,26 @@ class SeafloorFromFunction( Seafloor ):
 class SeafloorFromArray( Seafloor ):
     def __init__( self, seafloor: ndarray ):
         raise NotImplementedError()
+
+#%%
+if __name__ == '__main__':
+    from numpy import array, linspace, meshgrid
+    import matplotlib.pyplot as plt 
+
+    x = linspace( -5, 5, 1000 )
+    y = linspace( -5, 5, 1000 )
+    X, Y = meshgrid( x, y )
+    Z = seafloor_function_1( X, Y )
+
+    fig = plt.figure()
+    ax = fig.add_subplot( 111, projection='3d' )
+    ax.plot_surface( X, Y, Z, cmap='viridis' )
+    ax.set_title( 'Seafloor Function 0' )
+    ax.set_xlabel( 'X axis' )
+    ax.set_ylabel( 'Y axis' )
+    ax.set_zlabel( 'Depth' )
+    ax.axis('equal')
+    # ax.invert_yaxis()
+    # ax.invert_zaxis()
+    plt.show()
+# %%
