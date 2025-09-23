@@ -21,7 +21,7 @@ class VS:
     follower_pose: ndarray
         the pose of the leader
     target_feature: ndarray
-        the target feature in the form [H / H_max, sin(α)] with alpha the angle
+        the target feature in the form [H / H_max, sin(α), (dH + dH_max) / (2*dH_max)] with alpha the angle
         between the orientation of the robot and the orientation of the catenary
         projected in the horizontal (x-y) plane
     cable_length: float
@@ -77,8 +77,12 @@ class VS:
             cable_length: float = 1.0,
             maximum_H: float = None,
             maximum_dH: float = None,
-            gain: float = 1.0,
+            proportionnal_gain: ndarray = None,
+            integral_gain: ndarray = None,
+            derivative_gain: ndarray = None,
             actuation_projection_matrix: ndarray = None,
+            actuation_offset: ndarray = None,
+            time_step: float = 0.1,
             reference_frame: str = 'NED',
             record: bool = False,
             verbose: bool = False
@@ -87,7 +91,7 @@ class VS:
             raise ValueError( f'reference_frame must be one of {self.REFERENCE_FRAME}' )
 
         if leader_pose.flatten().shape[ 0 ] != 6 or follower_pose.flatten().shape[ 0 ] != 6:
-            raise ValueError( 'pose should be of size 6' )
+            raise ValueError( f'pose should be of size 6, not {leader_pose.shape} and {follower_pose.shape}' )
         
         if target_feature.flatten().shape[ 0 ] != 3:
             raise ValueError( 'target_feature should be of size 3' )
@@ -95,19 +99,57 @@ class VS:
         if maximum_H is not None and (maximum_H <= 0 or maximum_H > cable_length / 2):
             raise ValueError( 'maximum_H must be lower than half the cable length and positive' )
 
-        if gain <= 0:
-            raise ValueError( 'gain must be positive' )
-
         self.leader_pose = leader_pose
         self.follower_pose = follower_pose
 
         self.target_feature = target_feature
         self.catenary = Catenary(
-                length=cable_length, linear_mass=0, get_parameter_method='runtime', reference_frame=reference_frame
+                length=cable_length, linear_mass=0, get_parameter_method='runtime', reference_frame='ENU'
         )
+
+        self.is_ned = reference_frame == 'NED'
+
+        if proportionnal_gain is None:
+            self.proportionnal_gain = eye(3)
+        elif proportionnal_gain.shape != (3, 3):
+            raise ValueError( f'gain must be (3, 3) array, not {proportionnal_gain.shape}' )
+        else:
+            self.proportionnal_gain = proportionnal_gain
+
+        if integral_gain is None:
+            self.integral_gain = eye(3)
+        elif integral_gain.shape != (3, 3):
+            raise ValueError( f'gain must be (3, 3) array, not {integral_gain.shape}' )
+        else:
+            self.integral_gain = integral_gain
+
+        if derivative_gain is None:
+            self.derivative_gain = eye(3)
+        elif derivative_gain.shape != (3, 3):
+                raise ValueError( f'gain must be (3, 3) array, not {derivative_gain.shape}' )
+        else:
+            self.derivative_gain = derivative_gain
 
         if actuation_projection_matrix is None:
             self.actuation_projection_matrix = eye(6)
+        else:
+            if actuation_projection_matrix.shape[ 1 ] != 6:
+                raise ValueError( 'actuation_projection_matrix must have 6 columns' )
+            self.actuation_projection_matrix = actuation_projection_matrix
+
+        if actuation_offset is None:
+            self.actuation_offset = zeros((self.actuation_projection_matrix.shape[0],))
+        else:
+            if actuation_offset.shape[ 0 ] != self.actuation_projection_matrix.shape[0]:
+                raise ValueError( 'actuation_offset wrong size' )
+            self.actuation_offset = actuation_offset
+
+        self.error = zeros( (3,) )
+        self.previous_error = None
+        self.integral_error = zeros( (3,) )
+        self.derivative_error = zeros( (3,) )
+
+        self.time_step = time_step
 
         self.raw_result = zeros( (6,) )
         self.result = zeros( (self.actuation_projection_matrix.shape[ 0 ],) )
@@ -122,9 +164,11 @@ class VS:
         else:
             self.maximum_dH = maximum_dH
 
-        self.gain = gain
+        self.catenary_parameters = self.catenary.get_parameters( leader_pose[:3], follower_pose[:3] )
 
         self.compute_times = [ ]
+        self.features = [ ]
+        self.interaction_matrices = [ ]
 
         self.record = record
         self.verbose = verbose
@@ -143,71 +187,45 @@ class VS:
         if self.record:
             ti = perf_counter()
 
-        follower_angle = float( self.follower_pose[ 5 ] )
-        dx = float( self.leader_pose[ 0 ] - self.follower_pose[ 0 ] )
-        dy = float( self.leader_pose[ 1 ] - self.follower_pose[ 1 ] )
-        cable_angle = arctan2( dy, dx )
-        delta = cable_angle - follower_angle
-        angle = arctan2( sin( delta ), cos( delta ) )
-
-        C, H, dH, D, dD = self.catenary.get_parameters( self.leader_pose[ :3 ], self.follower_pose[ :3 ] )
-        L = self.catenary.length
-
-        a = H / self.maximum_H
-        b = sin( angle )
-        c = ( dH + self.maximum_dH ) / ( 2 * self.maximum_dH )
-
-        feature = array( [ a, b, c ] )
-
-        p = array([2 * D + dD, 0, dH]) @ Rotation.from_euler('z', follower_angle).as_matrix().T
-
-        T = zeros( (3, 6) )
-        T[:3, :3] = eye( 3 )
-        T[:3, 3:] = -cross(identity(p.shape[0]) * -1, p)
-        T *= -1
-
-        LD = H - D * sinh( C * D )
-        LdD = H + dH - ( D + dD ) * sinh( C * ( D + dD ) )
-
-        Cn = 2 * H + dH + 2 * L * sqrt(H * (H + dH) / pow(L, 2) - pow(dH, 2))
-        Cd = pow(L, 2) - pow(2 * H + dH, 2)
-
-        dCndH = 2 + L * (2 * H + dH) / sqrt(H * (H + dH) * pow(L, 2) - pow(dH, 2))
-        dCddH = -4 * (2 * H + dH)
-        dCnddH = 1 + (L * H * (pow(L, 2) + 2 * H * dH + pow(dH, 2))) / (pow(pow(H, 2) - pow(dH, 2), 1.5) * sqrt(H * ( H + dH)))
-        dCdddH = -2 * (2 * H + dH)
-
-        dCdH = 2 * (dCndH * Cd - dCddH * Cn) / pow(Cd, 2)
-        dCddH = 2 * (dCnddH * Cd - dCdddH * Cn) / pow(Cd, 2)
-
-        u = (C + LdD * dCdH) / (C * sinh( C * (D + dD)))
-        p = (C + LD * dCdH) / (C * sinh( C * D))
-        q = (LD * dCdH) / (C * sinh(C * D))
-        v = (C + LdD * dCddH) / (C * sinh( C * (D + dD)))
-
-        M = zeros( (3, 3) )
-        M[0, 0] = sqrt(1 - pow( b, 2)) / ((u + p) * self.maximum_H)
-        M[0, 1] = b / ((u + p) * self.maximum_H)
-        M[0, 2] = (v + q) / ((u + p) * self.maximum_H)
-
-        M[1, 0] = -b * sqrt(1 - pow( b, 2)) / ( 2 * D + dD )
-        M[1, 1] = (1 - pow( b, 2)) / ( 2 * D + dD )
-
-        M[2, 2] = 1 / ( 2 * self.maximum_dH )
+        self.catenary_parameters = self.catenary.get_parameters( self.leader_pose[:3], self.follower_pose[:3] )
+        feature = self.compute_feature()
+        T = self.compute_T()
+        M = self.compute_M()
 
         interaction_matrix = M @ T
+        inv_interaction_matrix = pinv( interaction_matrix )
 
-        self.raw_result = -self.gain * pinv( interaction_matrix ) @ (feature - self.target_feature)
+        self.error = feature - self.target_feature
+        self.error[1] = abs(self.error[1])
 
-        self.result = self.actuation_projection_matrix @ self.raw_result
+        if not self.previous_error is None:
+            self.derivative_error = ( self.error - self.previous_error ) / self.time_step
+
+        self.integral_error += self.error * self.time_step
+        self.previous_error = self.error.copy()
+
+        self.raw_result = (
+            -  inv_interaction_matrix @ self.proportionnal_gain @ self.error 
+            -  inv_interaction_matrix @ self.integral_gain @ self.integral_error 
+            -  inv_interaction_matrix @ self.derivative_gain @ self.derivative_error 
+        )
+        
+        if self.is_ned:
+            self.raw_result[1] *= -1
+            self.raw_result[2] *= -1
+            self.raw_result[4] *= -1
+            self.raw_result[5] *= -1
+
+        self.result = self.actuation_projection_matrix @ self.raw_result + self.actuation_offset
         
         if self.record:
+            self.features.append( feature )
+            self.interaction_matrices.append( interaction_matrix )
             self.compute_times.append( perf_counter() - ti )
 
         if self.verbose:
-            print(f'{C=}\t{H=}\t{dH=}\t{D=}\t{dD=}')
+            print(f'{self.catenary_parameters=}')
             print(f'{feature=}')
-            print(f'{angle=}')
             print(f'{M=}')
             print(f'{T=}')
             print(f'{interaction_matrix=}')
@@ -216,3 +234,77 @@ class VS:
             if self.record: print(f'{self.compute_times[-1]=}')
 
         return self.result
+
+    def compute_feature(self):
+        follower_angle = float( self.follower_pose[ 5 ] )
+        dx = float( self.leader_pose[ 0 ] - self.follower_pose[ 0 ] )
+        dy = float( self.leader_pose[ 1 ] - self.follower_pose[ 1 ] )
+        cable_angle = arctan2( dy, dx )
+        delta = cable_angle - follower_angle
+        angle = arctan2( sin( delta ), cos( delta ) )
+
+        _, H, dH, _, _ = self.catenary_parameters
+
+        a = H / self.maximum_H
+        b = sin( angle )
+        c = ( dH + self.maximum_dH ) / ( 2 * self.maximum_dH )
+
+        return array( [ a, b, c ] )
+    
+    def compute_T(self):
+
+        follower_angle = float( self.follower_pose[ 5 ] )
+        _, _, dH, D, dD = self.catenary_parameters
+        p = array([2 * D + dD, 0, dH]) @ Rotation.from_euler('z', follower_angle).as_matrix().T
+
+        T = zeros( (3, 6) )
+        T[:3, :3] = eye( 3 )
+        T[:3, 3:] = -cross(identity(p.shape[0]), p)
+        T *= -1
+
+        return T
+    
+    def compute_M(self):
+
+        C, H, dH, D, dD = self.catenary_parameters
+
+        feature = self.compute_feature()
+        b = feature[ 1 ]
+
+        L = self.catenary.length
+
+        Cn = 2 * H + dH + 2 * L * sqrt(H * (H + dH) / (pow(L, 2) - pow(dH, 2)))
+        Cd = pow(L, 2) - pow(2 * H + dH, 2)
+
+        dCndH = 2 + L * (2 * H + dH) / sqrt(H * (H + dH) * (pow(L, 2) - pow(dH, 2)))
+        dCddH = -4 * (2 * H + dH)
+
+        dCdH = 2 * (dCndH * Cd - dCddH * Cn) / pow(Cd, 2)
+
+        dCnddH = 1 + (L * H * (pow(L, 2) + 2 * H * dH + pow(dH, 2))) / (pow(pow(L, 2) - pow(dH, 2), 1.5) * sqrt(H * ( H + dH)))
+        dCdddH = -2 * (2 * H + dH)
+
+        dCddH = 2 * (dCnddH * Cd - dCdddH * Cn) / pow(Cd, 2)
+
+        LD = H - D * sinh( C * D )
+        
+        p = (C + LD * dCdH) / (C * sinh( C * D))
+        q = (LD * dCddH) / (C * sinh(C * D))
+
+        LdD = H + dH - ( D + dD ) * sinh( C * ( D + dD ) )
+
+        u = (C + LdD * dCdH) / (C * sinh( C * (D + dD)))
+        v = (C + LdD * dCddH) / (C * sinh( C * (D + dD)))
+
+        M = zeros( (3, 3) )
+
+        M[0, 0] = sqrt(1 - pow(b, 2)) / ((u + p) * self.maximum_H)
+        M[0, 1] = b / ((u + p) * self.maximum_H)
+        M[0, 2] = -(v + q) / ((u + p) * self.maximum_H)
+
+        M[1, 0] = -b * sqrt(1 - pow(b, 2)) / ( 2 * D + dD )
+        M[1, 1] = (1 - pow( b, 2)) / ( 2 * D + dD )
+
+        M[2, 2] = 1 / ( 2 * self.maximum_dH )
+
+        return M
