@@ -77,12 +77,9 @@ class VS:
             cable_length: float = 1.0,
             maximum_H: float = None,
             maximum_dH: float = None,
-            proportionnal_gain: ndarray = None,
-            integral_gain: ndarray = None,
-            derivative_gain: ndarray = None,
+            gain: float | ndarray = None,
             actuation_projection_matrix: ndarray = None,
             actuation_offset: ndarray = None,
-            time_step: float = 0.1,
             reference_frame: str = 'NED',
             record: bool = False,
             verbose: bool = False
@@ -96,39 +93,25 @@ class VS:
         if target_feature.flatten().shape[ 0 ] != 3:
             raise ValueError( 'target_feature should be of size 3' )
 
-        if maximum_H is not None and (maximum_H <= 0 or maximum_H > cable_length / 2):
-            raise ValueError( 'maximum_H must be lower than half the cable length and positive' )
-
         self.leader_pose = leader_pose
         self.follower_pose = follower_pose
 
         self.target_feature = target_feature
         self.catenary = Catenary(
-                length=cable_length, linear_mass=0, get_parameter_method='runtime', reference_frame='ENU'
+                length=cable_length, linear_mass=0, get_parameter_method='precompute', reference_frame='ENU'
         )
 
         self.is_ned = reference_frame == 'NED'
 
-        if proportionnal_gain is None:
-            self.proportionnal_gain = eye(3)
-        elif proportionnal_gain.shape != (3, 3):
-            raise ValueError( f'gain must be (3, 3) array, not {proportionnal_gain.shape}' )
+        if gain is None:
+            self.gain = eye(6)
         else:
-            self.proportionnal_gain = proportionnal_gain
-
-        if integral_gain is None:
-            self.integral_gain = eye(3)
-        elif integral_gain.shape != (3, 3):
-            raise ValueError( f'gain must be (3, 3) array, not {integral_gain.shape}' )
-        else:
-            self.integral_gain = integral_gain
-
-        if derivative_gain is None:
-            self.derivative_gain = eye(3)
-        elif derivative_gain.shape != (3, 3):
-                raise ValueError( f'gain must be (3, 3) array, not {derivative_gain.shape}' )
-        else:
-            self.derivative_gain = derivative_gain
+            if not (isinstance(gain, float) or (isinstance(gain, ndarray) and gain.shape == (6, 6))):
+                raise ValueError( f'gain must be float or (6, 6) array, not {gain.shape}' )
+            elif isinstance(gain, float):
+                self.gain = eye(6) * gain
+            else:
+                self.gain = gain
 
         if actuation_projection_matrix is None:
             self.actuation_projection_matrix = eye(6)
@@ -143,13 +126,6 @@ class VS:
             if actuation_offset.shape[ 0 ] != self.actuation_projection_matrix.shape[0]:
                 raise ValueError( 'actuation_offset wrong size' )
             self.actuation_offset = actuation_offset
-
-        self.error = zeros( (3,) )
-        self.previous_error = None
-        self.integral_error = zeros( (3,) )
-        self.derivative_error = zeros( (3,) )
-
-        self.time_step = time_step
 
         self.raw_result = zeros( (6,) )
         self.result = zeros( (self.actuation_projection_matrix.shape[ 0 ],) )
@@ -188,39 +164,27 @@ class VS:
             ti = perf_counter()
 
         self.catenary_parameters = self.catenary.get_parameters( self.leader_pose[:3], self.follower_pose[:3] )
+
         feature = self.compute_feature()
-        T = self.compute_T()
-        M = self.compute_M()
 
-        interaction_matrix = M @ T
-        inv_interaction_matrix = pinv( interaction_matrix )
+        try:
+            T = self.compute_T()
+            M = self.compute_M()
 
-        self.error = feature - self.target_feature
-        self.error[1] = abs(self.error[1])
+            interaction_matrix = M @ T
+            inv_interaction_matrix = pinv( interaction_matrix )
 
-        if not self.previous_error is None:
-            self.derivative_error = ( self.error - self.previous_error ) / self.time_step
+            error = feature - self.target_feature
+            error[1] = abs(error[1]) 
 
-        self.integral_error += self.error * self.time_step
-        self.previous_error = self.error.copy()
-
-        self.raw_result = (
-            -  inv_interaction_matrix @ self.proportionnal_gain @ self.error 
-            -  inv_interaction_matrix @ self.integral_gain @ self.integral_error 
-            -  inv_interaction_matrix @ self.derivative_gain @ self.derivative_error 
-        )
-        
-        if self.is_ned:
-            self.raw_result[1] *= -1
-            self.raw_result[2] *= -1
-            self.raw_result[4] *= -1
-            self.raw_result[5] *= -1
-
-        self.result = self.actuation_projection_matrix @ self.raw_result + self.actuation_offset
+            self.raw_result = - self.gain @ inv_interaction_matrix @ error 
+            self.result = self.actuation_projection_matrix @ self.raw_result + self.actuation_offset
+        except:
+            self.raw_result = zeros( (6,))
+            self.result = self.actuation_offset.copy()
         
         if self.record:
             self.features.append( feature )
-            self.interaction_matrices.append( interaction_matrix )
             self.compute_times.append( perf_counter() - ti )
 
         if self.verbose:
