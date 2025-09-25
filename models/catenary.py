@@ -2,7 +2,7 @@ from json import dump, load
 from pathlib import Path
 
 from numpy import (
-    arccosh, arcsinh, array, cosh, isnan, linspace, log10, logspace, meshgrid, ndarray, sinh, sqrt, zeros,
+    arccosh, arcsinh, array, cosh, isnan, linspace, log10, logspace, meshgrid, ndarray, sinh, sqrt, zeros, inf
 )
 from numpy.linalg import norm
 from scipy.optimize import brentq
@@ -203,9 +203,15 @@ class Catenary:
         two_D_plus_dD = norm( p1[ :2 ] - p0[ :2 ] )
 
         if norm( p1 - p0 ) > 0.99 * self.length or any( isnan( p0 ) ) or any( isnan( p1 ) ):
-            return None, 0.0, dH, 0.0, two_D_plus_dD
+            return 0.0, 0.0, dH, 0.0, two_D_plus_dD
         elif two_D_plus_dD < .01 * self.length:
-            return None, (self.length - dH) / 2, dH, two_D_plus_dD / 2, 0.
+            H = (self.length - dH) / 2
+            D = two_D_plus_dD / 2
+            dD = 0.0
+            Cn = 2 * H + dH + 2 * self.length * sqrt(H * (H + dH) / (pow(self.length, 2) - pow(dH, 2)))
+            Cd = pow(self.length, 2) - pow(2 * H + dH, 2)
+            C = 2 * Cn / Cd
+            return C, H, dH, D, dD
 
         C = brentq(
                 self.optimization_function, -1e-2, 1e3, args=(self.length, dH, two_D_plus_dD), xtol=1e-12
@@ -252,9 +258,15 @@ class Catenary:
         two_D_plus_dD = norm( p1[ :2 ] - p0[ :2 ] )
 
         if norm( p1 - p0 ) > 0.99 * self.length or any( isnan( p0 ) ) or any( isnan( p1 ) ):
-            return None, None, dH, None, None
+            return 0.0, 0.0, dH, 0.0, two_D_plus_dD
         elif two_D_plus_dD < .01 * self.length:
-            return None, (self.length - dH) / 2, dH, two_D_plus_dD / 2, 0.
+            H = (self.length - dH) / 2
+            D = two_D_plus_dD / 2
+            dD = 0.0
+            Cn = 2 * H + dH + 2 * self.length * sqrt(H * (H + dH) / (pow(self.length, 2) - pow(dH, 2)))
+            Cd = pow(self.length, 2) - pow(2 * H + dH, 2)
+            C = 2 * Cn / Cd
+            return C, H, dH, D, dD
 
         i = int( round( (1000 - 1) * abs( dH ) / self.length, 0 ) )
         j = int( round( (1000 - 1) * (log10( abs( two_D_plus_dD ) / self.length ) - (-2)) / (0 - (-2)), 0 ) )
@@ -285,10 +297,10 @@ class Catenary:
             self, p0: ndarray, p1: ndarray, C: float, H: float, dH: float, D: float, dD: float
     ) -> ndarray:
         # case where horizontal distance is too small
-        if (C is None) and (H is not None):
+        if abs(C) > 10000:
             return p0 + array( [ 0, 0, H + dH ] )
         # case where cable is taunt
-        elif C is None:
+        elif C == 0.0:
             return p0 if p0[ 2 ] >= p1[ 2 ] else p1
 
         lowest_point = zeros( (3,) )
@@ -300,14 +312,14 @@ class Catenary:
             self, p0: ndarray, p1: ndarray, C: float, H: float, dH: float, D: float, dD: float
     ) -> tuple:
         # case where horizontal distance is too small
-        if (C is None) and (D is not None):
+        if abs(C) > 10000 :
             return array(
                     [ 0., 0., self.linear_mass * G * (H + dH) ]
             ), array(
                     [ 0., 0., self.linear_mass * G * H ]
             )
         # case where cable is taunt
-        elif C is None:
+        elif C == 0.0:
             return None, None
 
         horizontal_perturbation = self.linear_mass * G / C
@@ -326,10 +338,10 @@ class Catenary:
 
     def _discretize( self, p0: ndarray, p1: ndarray, C: float, H: float, D: float, dD: float, n: int = 100 ) -> ndarray:
         # case where ΔH is too small
-        if (C is None) and (D is not None):
+        if abs(C) > 10000:
             return array( [ p0, p0 + array( [ 0, 0, H ] ), p1 ] )
         # case where cable is taunt
-        elif C is None:
+        elif C == 0.0:
             return array( [ p0, p1 ] )
 
         points = zeros( (100, 3) )
